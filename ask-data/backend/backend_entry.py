@@ -32,6 +32,13 @@ def bootstrap_cloudflare_tunnel():
     return process
 
 if __name__ == "__main__":
+    # 🔥 NEW: Path Correction Layer
+    # This forces Python to look inside the 'backend' folder regardless of where the script is executed
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+
     # 1. Self-heal dependencies first!
     install_dependencies()
     
@@ -54,4 +61,7 @@ if __name__ == "__main__":
         )
     finally:
         print("🛑 Cleaning up network tunnel resources...")
-        tunnel_proc.terminate()
+        try:
+            tunnel_proc.terminate()
+        except NameError:
+            pass
