@@ -77,7 +77,7 @@ if __name__ == "__main__":
                 
         except RuntimeError:
             # Fallback if Cloudera changes its runtime engine to a pure terminal context
-            uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info")
+            uvicorn.run("app.main:app", host="localhost", port=app_port, log_level="info")
             
     finally:
         print("🛑 Cleaning up network tunnel resources...")
