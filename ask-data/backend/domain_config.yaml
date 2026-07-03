@@ -1,0 +1,35 @@
+version: "1.0"
+domain: "Bank ABC Customer Analytics"
+
+tables:
+  customers:
+    description: "Contains core customer demographic profiles. Use this for identity, age, birthdays, and checking bank affiliation."
+    columns:
+      customer_id: "Primary key unique to each customer."
+      birth_date: "Date of birth. Crucial for calculating age or identifying upcoming birthdays."
+      bank_name: "The banking institution name (e.g., 'ABC', 'BNI'). Filter by this when queries specify a particular bank's customers."
+      
+  savings:
+    description: "Liquid savings account data including current balances and interest rates."
+    columns:
+      balance: "Current liquid money available. Use this for 'total savings' or 'wealthiest customers' metrics."
+      status: "Account state. Can be 'ACTIVE' or 'DORMANT'."
+
+  deposits:
+    description: "Time deposits / fixed-term investment accounts with specific lock-in periods."
+    columns:
+      principal_amount: "The initial locked investment amount."
+      maturity_date: "The date when the fixed deposit expires and pays out. Check this for 'approaching maturity' questions."
+
+  loans:
+    description: "Credit facilities and borrowing data extended to customers."
+    columns:
+      outstanding_balance: "The remaining amount the customer owes the bank."
+      maturity_date: "The final payoff deadline date for the loan."
+      loan_type: "Type of loan facility (e.g., 'Home', 'Auto', 'Personal')."
+
+common_rules:
+  temporal_queries:
+    birthday_this_week: "WHERE WEEK(birth_date) = WEEK(CURDATE())"
+    approaching_maturity: "WHERE maturity_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)"
+  active_records: "Filter status = 'ACTIVE' unless specified otherwise."
