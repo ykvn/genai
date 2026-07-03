@@ -1,16 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
+# ask-data/backend/app/main.py
+from fastapi import FastAPI, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.schemas.query import QueryRequest  # 👈 Clean import from your schema folder
 
 app = FastAPI(title="Bank ABC NL-to-SQL Core API")
-
-# 📥 1. Define what the incoming request data must look like
-class QueryRequest(BaseModel):
-    question: str  # The plain English question from the user (e.g., "Show me top 5 clients")
-
-# --- Existing Routes (Kept Exactly the Same) ---
 
 @app.get("/")
 def read_root():
@@ -39,17 +34,10 @@ def health_check(db: Session = Depends(get_db)):
             "database_error": str(e)
         }
 
-# --- 🚀 The New AI Placeholder Route ---
-
 @app.post("/ask")
 def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
-    """
-    Receives a natural language question, validates it via Pydantic,
-    and prepares to pass it to the text-to-SQL translation engine.
-    """
+    """Receives a validated natural language question from the schemas layer"""
     user_question = payload.question
-    
-    # Right now, we just print it to the logs and return it back to confirm receipt
     print(f"📥 Received a new question to translate: {user_question}")
     
     return {
