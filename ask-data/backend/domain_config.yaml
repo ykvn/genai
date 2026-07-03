@@ -1,35 +1,189 @@
+# ask-data/backend/domain_config.yaml
 version: "1.0"
 domain: "Bank ABC Customer Analytics"
+database_type: "MySQL 8.0"
+database_name: "bank_abc_analytics"
 
 tables:
   customers:
-    description: "Contains core customer demographic profiles. Use this for identity, age, birthdays, and checking bank affiliation."
+    description: "Contains core customer demographic profiles. Use this for identity, names, contact emails, age, birthdays, and checking bank affiliation."
     columns:
-      customer_id: "Primary key unique to each customer."
-      birth_date: "Date of birth. Crucial for calculating age or identifying upcoming birthdays."
-      bank_name: "The banking institution name (e.g., 'ABC', 'BNI'). Filter by this when queries specify a particular bank's customers."
+      customer_id:
+        type: "INT"
+        description: "Unique internal identity tracking number and primary key for each customer."
+        primary_key: true
+      first_name:
+        type: "VARCHAR(50)"
+        description: "The customer's first name."
+      last_name:
+        type: "VARCHAR(50)"
+        description: "The customer's last name or surname."
+      email:
+        type: "VARCHAR(100)"
+        description: "The electronic email address of the account holder."
+      birth_date:
+        type: "DATE"
+        description: "Date of birth. Crucial for calculating age or identifying upcoming birthdays."
+      bank_name:
+        type: "VARCHAR(50)"
+        description: "The banking institution name (e.g., 'ABC', 'BNI'). Filter by this when queries specify a particular bank's customers."
+      join_date:
+        type: "DATE"
+        description: "The exact date the customer first registered an account with the bank."
       
   savings:
     description: "Liquid savings account data including current balances and interest rates."
     columns:
-      balance: "Current liquid money available. Use this for 'total savings' or 'wealthiest customers' metrics."
-      status: "Account state. Can be 'ACTIVE' or 'DORMANT'."
+      savings_id:
+        type: "INT"
+        description: "Unique identity primary key for the savings record."
+        primary_key: true
+      customer_id:
+        type: "INT"
+        description: "Foreign key linking this account back to the customer profile."
+        references: "customers.customer_id"
+      account_number:
+        type: "VARCHAR(20)"
+        description: "The unique public-facing alphanumeric bank account identifier number."
+      balance:
+        type: "DECIMAL(15,2)"
+        description: "Current liquid money available. Use this for 'total savings' or 'wealthiest customers' metrics."
+      interest_rate:
+        type: "DECIMAL(4,2)"
+        description: "The annual percentage yield interest tracking rate assigned to this savings account."
+      status:
+        type: "VARCHAR(20)"
+        description: "Account state. Expected values are 'ACTIVE' or 'DORMANT'."
 
   deposits:
     description: "Time deposits / fixed-term investment accounts with specific lock-in periods."
     columns:
-      principal_amount: "The initial locked investment amount."
-      maturity_date: "The date when the fixed deposit expires and pays out. Check this for 'approaching maturity' questions."
+      deposit_id:
+        type: "INT"
+        description: "Unique primary key for the fixed deposit record."
+        primary_key: true
+      customer_id:
+        type: "INT"
+        description: "Foreign key mapping back to the customer profile record."
+        references: "customers.customer_id"
+      account_number:
+        type: "VARCHAR(20)"
+        description: "The unique account number identifier for this deposit facility."
+      principal_amount:
+        type: "DECIMAL(15,2)"
+        description: "The initial locked investment asset amount."
+      maturity_date:
+        type: "DATE"
+        description: "The date when the fixed deposit expires and pays out. Check this for 'approaching maturity' questions."
+      interest_rate:
+        type: "DECIMAL(4,2)"
+        description: "The fixed contract interest rate paid out at maturity."
+      status:
+        type: "VARCHAR(20)"
+        description: "The current status state of the investment term (e.g., 'ACTIVE')."
 
   loans:
     description: "Credit facilities and borrowing data extended to customers."
     columns:
-      outstanding_balance: "The remaining amount the customer owes the bank."
-      maturity_date: "The final payoff deadline date for the loan."
-      loan_type: "Type of loan facility (e.g., 'Home', 'Auto', 'Personal')."
+      loan_id:
+        type: "INT"
+        description: "Unique identity primary key for the loan entry."
+        primary_key: true
+      customer_id:
+        type: "INT"
+        description: "Foreign key mapping back to the customer debtor record."
+        references: "customers.customer_id"
+      loan_type:
+        type: "VARCHAR(30)"
+        description: "Type of loan facility (e.g., 'Home', 'Auto', 'Personal')."
+      principal_amount:
+        type: "DECIMAL(15,2)"
+        description: "The original total borrowed credit capital sum."
+      outstanding_balance:
+        type: "DECIMAL(15,2)"
+        description: "The remaining debt balance amount the customer still owes the bank."
+      maturity_date:
+        type: "DATE"
+        description: "The final payoff deadline date for the loan obligation."
+      status:
+        type: "VARCHAR(20)"
+        description: "Operational loan indicator flag status state (e.g., 'ACTIVE')."
+
+  credit_cards:
+    description: "Credit card account statements, revolving limits, and balances extended to customers."
+    columns:
+      card_id:
+        type: "INT"
+        description: "Unique primary key for the card instance."
+        primary_key: true
+      customer_id:
+        type: "INT"
+        description: "Foreign key tracking which customer owns the credit card account limit."
+        references: "customers.customer_id"
+      card_number:
+        type: "VARCHAR(20)"
+        description: "The unique plastic card PAN number format identifier sequence."
+      credit_limit:
+        type: "DECIMAL(15,2)"
+        description: "The maximum revolving credit threshold limit extended to the customer."
+      current_balance:
+        type: "DECIMAL(15,2)"
+        description: "The active amount spent and currently owed on the credit card balance."
+      expiry_date:
+        type: "DATE"
+        description: "The operational expiration timeline date of the card."
+      status:
+        type: "VARCHAR(20)"
+        description: "Revolving line risk indicators. Expected values are 'ACTIVE' or 'WARNING'."
+
+  transactions:
+    description: "Tracks all financial ledger postings, operational deposits, cash extractions, and adjustments across accounts."
+    columns:
+      transaction_id:
+        type: "INT"
+        description: "Unique internal tracking sequential ledger primary key."
+        primary_key: true
+      account_number:
+        type: "VARCHAR(20)"
+        description: "The account target number receiving or sending the asset allocation. Joins back to savings or deposits account numbers."
+      amount:
+        type: "DECIMAL(15,2)"
+        description: "The absolute numerical money value of the execution."
+      transaction_type:
+        type: "VARCHAR(10)"
+        description: "Accounting ledger category direction indicator flags. Expected values are 'DEBIT' (withdrawals/charges) or 'CREDIT' (deposits/payroll)."
+      transaction_timestamp:
+        type: "DATETIME"
+        description: "The complete system timestamp tracker of when the execution posted to the ledger."
+      description:
+        type: "VARCHAR(255)"
+        description: "The descriptive transaction text annotation (e.g., 'ATM Withdrawal', 'Payroll Transfer')."
+
+  branch_performance:
+    description: "Regional business analytics metrics and performance dashboards indicating growth metrics."
+    columns:
+      branch_id:
+        type: "INT"
+        description: "Unique branch identifier primary key."
+        primary_key: true
+      branch_name:
+        type: "VARCHAR(50)"
+        description: "The clean geographical or municipal name designation of the branch location."
+      region:
+        type: "VARCHAR(50)"
+        description: "The broader provincial administrative territory area grouping (e.g., 'DKI Jakarta')."
+      total_active_customers:
+        type: "INT"
+        description: "Total foot-traffic client profile count actively assigned to this node."
+      monthly_target_achieved:
+        type: "DECIMAL(5,2)"
+        description: "Performance target milestone percentage index ranking tracker."
 
 common_rules:
   temporal_queries:
     birthday_this_week: "WHERE WEEK(birth_date) = WEEK(CURDATE())"
     approaching_maturity: "WHERE maturity_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)"
   active_records: "Filter status = 'ACTIVE' unless specified otherwise."
+  security_guardrails:
+    max_limit: "Always append 'LIMIT 100' to select queries if no explicit limit is requested by the user to protect system memory."
+    read_only: "Only allow SELECT operations. Forcefully block any incoming requests attempting to execute INSERT, UPDATE, DELETE, or DROP commands."
