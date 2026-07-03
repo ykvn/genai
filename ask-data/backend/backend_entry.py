@@ -65,7 +65,7 @@ if __name__ == "__main__":
             print("🔄 Active CML event loop detected. Launching web server on isolated thread...")
             
             server_thread = threading.Thread(
-                target=lambda: uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info"),
+                target=lambda: uvicorn.run("app.main:app", host="localhost", port=app_port, log_level="info"),
                 daemon=True
             )
             server_thread.start()
