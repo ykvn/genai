@@ -1,3 +1,4 @@
+```
 bank-abc/
 ├── ask-data/                        # Bank ABC — Customer Analytics PoC
 │   ├── backend/                     # FastAPI + NL-to-SQL + ChromaDB RAG
@@ -33,3 +34,4 @@ bank-abc/
 ├── scripts/
 │   └── cml_bootstrap.sh             # Automation script to install dependencies
 └── README.md
+```
