@@ -12,11 +12,11 @@ DB_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")  # <-- Change this to local loopb
 DB_PORT = os.getenv("MYSQL_PORT", "3306")
 DB_NAME = os.getenv("MYSQL_DATABASE", "bank_abc_analytics")
 
-# 2. Build connection URL using PyMySQL snake_case parameters
-# PyMySQL does not use SSL by default, so we drop useSSL=false completely.
+# 2. Build connection URL (Clean & Python-native)
+# PyMySQL natively handles the RSA key exchange via the 'cryptography' package 
+# without requiring any extra URL flags.
 SQLALCHEMY_DATABASE_URL = (
     f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-    f"?allow_public_key_retrieval=true"
 )
 
 # 3. Initialize Engine and Session Factory
