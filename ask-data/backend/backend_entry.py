@@ -40,8 +40,22 @@ if __name__ == "__main__":
     
     try:
         print("🌐 Launching FastAPI Backend Web Server...")
-        app_port = int(os.getenv("CDSW_APP_PORT", 8090))
-        uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info")
+        
+        # Change the fallback port from 8090 to 8000 to avoid JupyterLab
+        app_port = int(os.getenv("CDSW_APP_PORT", 8000))
+        
+        # Safety check: If CML environment variable happens to default to 8090 in this session, override it to 8000
+        if app_port == 8090:
+            app_port = 8000
+            
+        print(f"📡 Binding server to port: {app_port}")
+        
+        uvicorn.run(
+            "app.main:app", 
+            host="0.0.0.0", 
+            port=app_port, 
+            log_level="info"
+        )
     finally:
         print("🛑 Cleaning up network tunnel resources...")
         tunnel_proc.terminate()
