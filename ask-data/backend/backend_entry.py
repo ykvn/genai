@@ -41,14 +41,15 @@ if __name__ == "__main__":
     try:
         print("🌐 Launching FastAPI Backend Web Server...")
         
-        # Change the fallback port from 8090 to 8000 to avoid JupyterLab
-        app_port = int(os.getenv("CDSW_APP_PORT", 8000))
+        # 1. Look for the CML environment port, defaulting to 8055
+        app_port = int(os.getenv("CDSW_APP_PORT", 8055))
         
-        # Safety check: If CML environment variable happens to default to 8090 in this session, override it to 8000
-        if app_port == 8090:
-            app_port = 8000
+        # 2. Hard guard: If the environment forces a conflict port inside the session workbench, override it
+        if app_port in [8000, 8090]:
+            print(f"⚠️ Port {app_port} is system-reserved. Diverting traffic...")
+            app_port = 8055
             
-        print(f"📡 Binding server to port: {app_port}")
+        print(f"📡 Binding server to safe port: {app_port}")
         
         uvicorn.run(
             "app.main:app", 
