@@ -4,6 +4,8 @@ import time
 import sys
 import urllib.request
 import uvicorn
+import threading
+import asyncio
 
 def install_dependencies():
     """Automatically installs packages from requirements.txt on startup"""
@@ -32,8 +34,8 @@ def bootstrap_cloudflare_tunnel():
     return process
 
 if __name__ == "__main__":
-    # 🛠️ Updated Safe Path Correction Layer
-    # Uses __file__ if running as a script, or falls back to Cloudera's home directory if in a notebook cell
+    # 🛠️ Safe Path Correction Layer
+    # Uses __file__ if running as a pure script, or falls back to Cloudera's home directory if inside CML's wrapper
     if '__file__' in globals():
         script_dir = os.path.dirname(os.path.abspath(__file__))
     else:
@@ -52,18 +54,31 @@ if __name__ == "__main__":
     
     try:
         print("🌐 Launching FastAPI Backend Web Server...")
-        
-        # Strictly follow the port assigned by Cloudera AI (defaults to 8090 in most CML environments)
         app_port = int(os.getenv("CDSW_APP_PORT", 8090))
-            
         print(f"📡 Binding server to Cloudera Assigned Port: {app_port}")
         
-        uvicorn.run(
-            "app.main:app", 
-            host="0.0.0.0", 
-            port=app_port, 
-            log_level="info"
-        )
+        # 🛠️ Dynamic Loop Handler for CML Application Engine
+        # Since CML runs applications inside an active IPython event loop wrapper,
+        # spin Uvicorn up on a separate execution thread to bypass the conflict.
+        try:
+            asyncio.get_running_loop()
+            print("🔄 Active CML event loop detected. Launching web server on isolated thread...")
+            
+            server_thread = threading.Thread(
+                target=lambda: uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info"),
+                daemon=True
+            )
+            server_thread.start()
+            
+            # Keep the parent container process alive while the web server runs
+            print("🚀 Application is live and listening!")
+            while server_thread.is_alive():
+                time.sleep(1)
+                
+        except RuntimeError:
+            # Fallback if Cloudera changes its runtime engine to a pure terminal context
+            uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info")
+            
     finally:
         print("🛑 Cleaning up network tunnel resources...")
         try:
