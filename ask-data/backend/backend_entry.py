@@ -32,9 +32,14 @@ def bootstrap_cloudflare_tunnel():
     return process
 
 if __name__ == "__main__":
-    # 🔥 NEW: Path Correction Layer
-    # This forces Python to look inside the 'backend' folder regardless of where the script is executed
-    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 🛠️ Updated Safe Path Correction Layer
+    # Uses __file__ if running as a script, or falls back to Cloudera's home directory if in a notebook cell
+    if '__file__' in globals():
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+    else:
+        cml_default_backend = "/home/cdsw/ask-data/backend"
+        script_dir = cml_default_backend if os.path.exists(cml_default_backend) else os.getcwd()
+        
     os.chdir(script_dir)
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
