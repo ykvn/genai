@@ -41,15 +41,10 @@ if __name__ == "__main__":
     try:
         print("🌐 Launching FastAPI Backend Web Server...")
         
-        # 1. Look for the CML environment port, defaulting to 8055
-        app_port = int(os.getenv("CDSW_APP_PORT", 8055))
-        
-        # 2. Hard guard: If the environment forces a conflict port inside the session workbench, override it
-        if app_port in [8000, 8090]:
-            print(f"⚠️ Port {app_port} is system-reserved. Diverting traffic...")
-            app_port = 8055
+        # Strictly follow the port assigned by Cloudera AI (defaults to 8090 in most CML environments)
+        app_port = int(os.getenv("CDSW_APP_PORT", 8090))
             
-        print(f"📡 Binding server to safe port: {app_port}")
+        print(f"📡 Binding server to Cloudera Assigned Port: {app_port}")
         
         uvicorn.run(
             "app.main:app", 
