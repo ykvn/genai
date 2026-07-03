@@ -1,0 +1,19 @@
+# Cloudera / Python runtime environments
+__pycache__/
+*.pyc
+.env
+venv/
+.cml/
+
+# Frontend builds
+node_modules/
+.next/
+dist/
+
+# PoC Data Exclusions (Per specifications)
+ask-data/data/documents/*
+!ask-data/data/documents/.gitkeep
+ask-data/chroma_db/
+
+# System files
+.DS_Store
