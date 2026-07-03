@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker
 # 1. Database Credentials Configuration
 # In Cloudera (CML), it's best practice to set these as Environment Variables
 # Change DB_HOST to point to the local port exposed by your tunnel
-DB_USER = os.getenv("MYSQL_USER", "your_username")
-DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "your_password")
+DB_USER = os.getenv("MYSQL_USER", "root")
+DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "Od!gVP7f98hDuYXmXN&P&gB98XGp")
 DB_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")  # <-- Change this to local loopback
 DB_PORT = os.getenv("MYSQL_PORT", "3306")
 DB_NAME = os.getenv("MYSQL_DATABASE", "bank_abc_analytics")
