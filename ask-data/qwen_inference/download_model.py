@@ -3,8 +3,8 @@ import os
 from huggingface_hub import snapshot_download
 
 def download_qwen_model():
-    # 🎯 Changed target to the lightweight 3B model (Only ~2.69 GB total size!)
-    model_repo = "Qwen/Qwen2.5-3B-Instruct-AWQ"
+    # 🎯 Swapped to the ultra-lightweight 1.5B model (Only ~1.1 GB total footprint!)
+    model_repo = "Qwen/Qwen2.5-1.5B-Instruct-AWQ"
     
     current_dir = os.path.dirname(os.path.abspath(__file__))
     target_dir = os.path.join(current_dir, "model_weights")
