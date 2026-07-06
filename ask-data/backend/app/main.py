@@ -1,11 +1,15 @@
 # ask-data/backend/app/main.py
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.query import QueryRequest  # 👈 Clean import from your schema folder
+from app.schemas.query import QueryRequest
+from app.services.translator import SQLTranslationService  # 👈 Import our new service
 
 app = FastAPI(title="Bank ABC NL-to-SQL Core API")
+
+# Initialize the service instance once when the application starts
+translator_service = SQLTranslationService()
 
 @app.get("/")
 def read_root():
@@ -36,11 +40,19 @@ def health_check(db: Session = Depends(get_db)):
 
 @app.post("/ask")
 def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
-    """Receives a validated natural language question from the schemas layer"""
-    user_question = payload.question
-    print(f"📥 Received a new question to translate: {user_question}")
-    
-    return {
-        "received_question": user_question,
-        "status": "In progress - awaiting AI translation logic"
-    }
+    """Receives a natural language question and generates the LLM context prompt"""
+    try:
+        user_question = payload.question
+        
+        # 🏗️ Generate the complete system prompt layout using our YAML config data
+        system_context = translator_service.build_llm_system_context()
+        
+        # Return the question and the prompt to verify everything links up perfectly
+        return {
+            "received_question": user_question,
+            "status": "Metadata compilation successful",
+            "generated_llm_system_prompt": system_context
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Translation Service Error: {str(e)}")
