@@ -24,18 +24,35 @@ def health_check(db: Session = Depends(get_db)):
 
 @app.post("/ask")
 def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
-    """Processes natural language questions all the way through prompt construction and SQL prediction"""
+    """
+    Processes natural language questions, translates them to SQL, 
+    and executes the query against the database to return real live records.
+    """
     try:
         user_question = payload.question
         
-        # 🚀 Invoke the LLM pipeline (calls vLLM or uses the test fallback smoothly)
+        # 1. Translate the English question into a SQL query string
         generated_sql = translator_service.generate_sql(user_question)
+        
+        # 2. Execute the query directly on your home MySQL server via SQLAlchemy
+        # We wrap the string query in SQLAlchemy's text() function for safety
+        db_result = db.execute(text(generated_sql))
+        
+        # 3. Convert the database rows into a list of dictionaries so FastAPI can turn it into JSON
+        # db_result.mappings() allows us to access columns by their name keys automatically
+        records = [dict(row) for row in db_result.mappings()]
         
         return {
             "question": user_question,
-            "status": "SQL Code Generation Successful",
-            "predicted_sql": generated_sql
+            "status": "Success",
+            "predicted_sql": generated_sql,
+            "row_count": len(records),
+            "data": records  # 👈 This will hold your live database rows!
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM Translation Layer Error: {str(e)}")
+        # Catch any database errors (like bad syntax or missing tables) and report them cleanly
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Database Execution Failure: {str(e)}"
+        )
