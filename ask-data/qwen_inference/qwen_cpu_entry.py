@@ -8,17 +8,7 @@ from pydantic import BaseModel
 import uvicorn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# 1. 📂 Safe Directory Resolution (Prevents NameError in CML Application runner)
-if "__file__" in globals():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-else:
-    # Fallback to current working directory if execution environment hides __file__
-    script_dir = os.getcwd()
-
-# Align Python's internal path tracker to our model folder context
-os.chdir(script_dir)
-
-# 2. 📦 Standard Dependency Installer
+# 1. 📦 Standard Dependency Installer
 def install_dependencies():
     """Automatically installs packages from requirements.txt on startup"""
     requirements_path = "requirements.txt"
@@ -32,12 +22,33 @@ def install_dependencies():
 # Run your installer immediately upon boot
 install_dependencies()
 
+# 2. 📂 Bulletproof Directory Search for Model Weights
+# This scans all potential nested directory locations to locate your downloaded weights
+base_cwd = os.getcwd()
+candidate_paths = [
+    os.path.join(base_cwd, "ask-data", "qwen_inference", "model_weights_cpu"),
+    os.path.join(base_cwd, "qwen_inference", "model_weights_cpu"),
+    os.path.join(base_cwd, "model_weights_cpu")
+]
+
+model_path = None
+for path in candidate_paths:
+    if os.path.exists(path) and os.path.isdir(path):
+        # Double check that the folder isn't empty and contains the model files
+        if "config.json" in os.listdir(path):
+            model_path = path
+            break
+
+if not model_path:
+    print("❌ Critical Error: Could not locate 'model_weights_cpu' directory on disk.")
+    print(f"Searched target locations: {candidate_paths}")
+    sys.exit(1)
+
+print(f"📍 Successfully located model weights folder at: {model_path}")
+
 # --- SERVER INITIALIZATION ---
 
 app = FastAPI(title="Qwen 1.5B CPU OpenAI-Aligned Inference Engine")
-
-# Resolve local CPU-compatible model paths safely
-model_path = os.path.join(script_dir, "model_weights_cpu")
 
 print("⏳ Loading Qwen 1.5B model weights into system RAM...")
 tokenizer = AutoTokenizer.from_pretrained(model_path)
