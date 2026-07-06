@@ -1,6 +1,7 @@
-fastapi
-uvicorn
-sqlalchemy
-pymysql
-cryptography
-PyYAML
+fastapi>=0.110.0
+uvicorn>=0.28.0
+transformers>=4.45.0
+accelerate>=0.30.0
+torch>=2.2.0
+pydantic>=2.6.0
+nest_asyncio>=1.6.0
