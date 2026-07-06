@@ -8,7 +8,17 @@ from pydantic import BaseModel
 import uvicorn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# 1. 📦 Your Clean, Standard Dependency Installer
+# 1. 📂 Safe Directory Resolution (Prevents NameError in CML Application runner)
+if "__file__" in globals():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+else:
+    # Fallback to current working directory if execution environment hides __file__
+    script_dir = os.getcwd()
+
+# Align Python's internal path tracker to our model folder context
+os.chdir(script_dir)
+
+# 2. 📦 Standard Dependency Installer
 def install_dependencies():
     """Automatically installs packages from requirements.txt on startup"""
     requirements_path = "requirements.txt"
@@ -19,16 +29,14 @@ def install_dependencies():
     else:
         print("⚠️ Warning: requirements.txt not found in current directory.")
 
-# Coordinate execution paths and run your installer immediately upon boot
-script_dir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(script_dir)
+# Run your installer immediately upon boot
 install_dependencies()
 
 # --- SERVER INITIALIZATION ---
 
 app = FastAPI(title="Qwen 1.5B CPU OpenAI-Aligned Inference Engine")
 
-# 2. Resolve local CPU-compatible model paths
+# Resolve local CPU-compatible model paths safely
 model_path = os.path.join(script_dir, "model_weights_cpu")
 
 print("⏳ Loading Qwen 1.5B model weights into system RAM...")
