@@ -10,7 +10,7 @@ def download_qwen_model():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     target_dir = os.path.join(current_dir, "model_weights")
     
-    # 🔑 1. Check for the Hugging Face authentication token
+    # Check for the Hugging Face authentication token
     hf_token = os.getenv("HF_TOKEN")
     
     if hf_token:
@@ -20,6 +20,7 @@ def download_qwen_model():
 
     print(f"🚀 Initiating secure download stream for: {model_repo}")
     print(f"📂 Target local project destination: {target_dir}")
+    print("🐌 Throttling set: Downloading sequentially (max_workers=1) to preserve container stability.")
     
     try:
         # Pull down the model snapshot cleanly
@@ -28,8 +29,8 @@ def download_qwen_model():
             local_dir=target_dir,
             local_dir_use_symlinks=False,
             ignore_patterns=["*.msgpack", "*.h5"], # Exclude formats we don't need for vLLM
-            max_workers=4,
-            token=hf_token  # 👈 2. Injected token parameter here
+            max_workers=1,  # 👈 Changed from 4 to 1 to naturally slow down and stabilize the stream
+            token=hf_token  
         )
         print(f"\n✅ Model files downloaded completely and verified at: {model_path}")
         
