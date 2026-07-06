@@ -3,7 +3,9 @@ import os
 from huggingface_hub import snapshot_download
 
 def download_qwen_model():
-    model_repo = "Qwen/Qwen2.5-14B-Instruct-AWQ"
+    # 🎯 Changed target to the lightweight 3B model (Only ~2.69 GB total size!)
+    model_repo = "Qwen/Qwen2.5-3B-Instruct-AWQ"
+    
     current_dir = os.path.dirname(os.path.abspath(__file__))
     target_dir = os.path.join(current_dir, "model_weights")
     
@@ -19,7 +21,7 @@ def download_qwen_model():
             local_dir=target_dir,
             local_dir_use_symlinks=False,
             ignore_patterns=["*.msgpack", "*.h5"],
-            max_workers=1,  # 👈 Single-threaded execution prevents disk lockups
+            max_workers=1,  # Kept at 1 for safe, stable sequential downloads
             token=hf_token  
         )
         print(f"\n✅ Model files downloaded completely and verified at: {model_path}")
