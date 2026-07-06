@@ -8,15 +8,28 @@ from pydantic import BaseModel
 import uvicorn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# 1. Self-heal basic server dependencies
-print("📦 Validating API container dependencies...")
-subprocess.check_call([sys.executable, "-m", "pip", "install", "fastapi", "uvicorn", "transformers", "accelerate"])
+# 1. 📦 Your Clean, Standard Dependency Installer
+def install_dependencies():
+    """Automatically installs packages from requirements.txt on startup"""
+    requirements_path = "requirements.txt"
+    if os.path.exists(requirements_path):
+        print("📦 Found requirements.txt. Ensuring all inference dependencies are installed...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
+        print("✅ Dependencies up to date.")
+    else:
+        print("⚠️ Warning: requirements.txt not found in current directory.")
+
+# Coordinate execution paths and run your installer immediately upon boot
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
+install_dependencies()
+
+# --- SERVER INITIALIZATION ---
 
 app = FastAPI(title="Qwen 1.5B CPU OpenAI-Aligned Inference Engine")
 
 # 2. Resolve local CPU-compatible model paths
-current_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(current_dir, "model_weights_cpu")
+model_path = os.path.join(script_dir, "model_weights_cpu")
 
 print("⏳ Loading Qwen 1.5B model weights into system RAM...")
 tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -42,10 +55,10 @@ class OpenAIPayload(BaseModel):
 def generate_sql_on_cpu(payload: OpenAIPayload):
     """Natively unpacks your translator's OpenAI messages payload on CPU threads"""
     
-    # Extract the system context and user question directly from your translator's array layout
     system_prompt = ""
     user_question = ""
     
+    # Extract the system context and user question from your translator's array layout
     for msg in payload.messages:
         if msg.role == "system":
             system_prompt = msg.content
@@ -72,7 +85,6 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
     generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     
-    # Return structured formatting to exactly match your translator's result["choices"][0] reader
     return {
         "choices": [{
             "message": {
@@ -83,7 +95,9 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
     }
 
 if __name__ == "__main__":
+    # Fetch the Cloudera-assigned environment port
     app_port = int(os.getenv("CDSW_APP_PORT", 8001))
     print(f"🌐 Starting Aligned CPU Inference Server on http://localhost:{app_port}")
     
+    # Bound tightly to localhost to respect your enterprise proxy requirements
     uvicorn.run(app, host="localhost", port=app_port, log_level="info")
