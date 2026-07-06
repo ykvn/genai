@@ -1,41 +1,51 @@
 # ask-data/qwen_inference/download_model.py
 import os
-from huggingface_hub import snapshot_download
+import time
+import requests
+from huggingface_hub import list_repo_files, hf_hub_url
+from tqdm import tqdm
 
-def download_qwen_model():
-    # Define the definitive production model repository
+def download_qwen_model_throttled():
     model_repo = "Qwen/Qwen2.5-14B-Instruct-AWQ"
-    
-    # Force the target storage to sit right within your project directory structure
     current_dir = os.path.dirname(os.path.abspath(__file__))
     target_dir = os.path.join(current_dir, "model_weights")
+    os.makedirs(target_dir, exist_ok=True)
     
-    # Check for the Hugging Face authentication token
     hf_token = os.getenv("HF_TOKEN")
+    headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
     
-    if hf_token:
-        print("🔑 Authenticated token detected! Requesting high-speed priority band from HF Hub.")
-    else:
-        print("⚠️ WARNING: No HF_TOKEN detected. Continuing with unauthenticated restrictions.")
-
-    print(f"🚀 Initiating secure download stream for: {model_repo}")
-    print(f"📂 Target local project destination: {target_dir}")
-    print("🐌 Throttling set: Downloading sequentially (max_workers=1) to preserve container stability.")
+    print(f"🐢 Throttling Active: Limiting maximum download speed to ~50 MB/s.")
     
-    try:
-        # Pull down the model snapshot cleanly
-        model_path = snapshot_download(
-            repo_id=model_repo,
-            local_dir=target_dir,
-            local_dir_use_symlinks=False,
-            ignore_patterns=["*.msgpack", "*.h5"], # Exclude formats we don't need for vLLM
-            max_workers=1,  # 👈 Changed from 4 to 1 to naturally slow down and stabilize the stream
-            token=hf_token  
-        )
-        print(f"\n✅ Model files downloaded completely and verified at: {model_path}")
+    # 1. Fetch the complete list of files inside the repository
+    files = list_repo_files(repo_id=model_repo, token=hf_token)
+    
+    for file_name in files:
+        # Skip unnecessary files
+        if any(file_name.endswith(ext) for ext in [".msgpack", ".h5"]):
+            continue
+            
+        local_file_path = os.path.join(target_dir, file_name)
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
         
-    except Exception as e:
-        print(f"\n❌ Error downloading model weights from Hugging Face: {str(e)}")
+        # Build the direct download endpoint URL
+        url = hf_hub_url(repo_id=model_repo, filename=file_name)
+        
+        # 2. Stream the file chunk by chunk
+        with requests.get(url, headers=headers, stream=True) as r:
+            r.raise_for_status()
+            total_size = int(r.headers.get('content-length', 0))
+            
+            # Capping speed: Write 5 Megabytes, then sleep 0.1 seconds (= ~50 MB/s Max)
+            chunk_size = 5 * 1024 * 1024 
+            
+            with open(local_file_path, 'wb') as f, tqdm(
+                desc=file_name, total=total_size, unit='B', unit_scale=True
+            ) as pbar:
+                for chunk in r.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        f.write(chunk)
+                        pbar.update(len(chunk))
+                        time.sleep(0.1) # 🐌 The brake pedal forcing a 10x slowdown
 
 if __name__ == "__main__":
-    download_qwen_model()
+    download_qwen_model_throttled()
