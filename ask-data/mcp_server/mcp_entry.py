@@ -1,0 +1,92 @@
+import os
+import sys
+from fastapi import FastAPI, Request
+from starlette.routing import Mount
+import uvicorn
+
+# Core FastMCP and Server-Sent Events protocol components
+from fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+
+# 1. Initialize the central FastMCP application state
+mcp = FastMCP("Bank-ABC-Modular-Orchestrator")
+
+# 2. Configure the standardized SSE message pipeline transport
+sse = SseServerTransport("/messages")
+
+# --- ACTIVE TOOL REGISTRATION ---
+# Dynamically register your standalone tool function into the FastMCP instance
+from app.tools.sql_query import execute_banking_query
+
+@mcp.tool(name="execute_banking_query")
+def mcp_execute_banking_query(sql_query: str) -> str:
+    """
+    Executes a read-only MySQL SELECT statement against the live bank analytics database 
+    through the secure tunnel and returns rows as a formatted JSON string.
+    """
+    return execute_banking_query(sql_query)
+
+# Dynamically register your unstructured RAG search engine into the FastMCP instance
+from app.tools.rag_search import perform_rag_search
+
+@mcp.tool(name="search_policy_knowledge_base")
+def mcp_search_policy_knowledge_base(query: str) -> str:
+    """
+    Scans through internal unstructured enterprise banking policies, compliance guidelines, 
+    and SOP documents to return relevant textual contextual snippets for a given query.
+    """
+    return perform_rag_search(query)
+
+# Dynamically register your specialized risk analytics engine into the FastMCP instance
+from app.tools.dormant_risk import calculate_dormant_account_risk
+
+@mcp.tool(name="evaluate_dormant_account_risk")
+def mcp_evaluate_dormant_account_risk(days_inactive: int, account_balance: float, sudden_withdrawal_amount: float = 0.0) -> str:
+    """
+    Calculates a risk priority score, classification tier, and security intervention flags 
+    for an inactive bank account using internal compliance risk matrix rules.
+    """
+    return calculate_dormant_account_risk(days_inactive, account_balance, sudden_withdrawal_amount)
+
+
+# 3. Create the FastAPI container to manage incoming enterprise cluster traffic
+app = FastAPI(title="Bank ABC Production MCP Gateway")
+
+# Route incoming protocol control packets cleanly into the SSE transport layer
+app.router.routes.append(Mount("/messages", app=sse.handle_post_message))
+
+
+@app.get("/health")
+def platform_health_check():
+    """Basic endpoint used by Cloudera AI to verify the container layer is active"""
+    return {
+        "status": "healthy", 
+        "protocol": "Model Context Protocol v1", 
+        "transport": "Server-Sent Events (SSE)"
+    }
+
+
+@app.get("/sse")
+async def handle_sse_handshake(request: Request):
+    """Establishes the long-lived protocol connection stream for incoming AI clients"""
+    async with sse.connect_sse(
+        request.scope, request.receive, request._send
+    ) as streams:
+        await mcp._mcp_server.run(
+            streams[0], streams[1], mcp._mcp_server.create_initialization_options()
+        )
+
+
+if __name__ == "__main__":
+    # Follow the dedicated application port assigned by Cloudera AI
+    app_port = int(os.getenv("CDSW_APP_PORT", 8090))
+    
+    print(f"🌐 Launching Production MCP Server on http://localhost:{app_port}")
+    print(f"📡 Serving protocol streams on http://localhost:{app_port}/sse")
+    
+    uvicorn.run(
+        app, 
+        host="localhost",  # 🔒 Locked strictly to localhost per enterprise guidelines
+        port=app_port, 
+        log_level="info"
+    )
