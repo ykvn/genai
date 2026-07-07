@@ -62,7 +62,8 @@ CRITICAL: The 'customers' table does NOT have a 'status' column. To find active 
                 headers={"Content-Type": "application/json"},
                 method="POST"
             )
-            with urllib.request.urlopen(req, timeout=10) as response:
+            # 🔄 CHANGE TIMEOUT FROM 10 TO 60 SECONDS
+            with urllib.request.urlopen(req, timeout=60) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 generated_sql = result["choices"][0]["message"]["content"].strip()
                 
