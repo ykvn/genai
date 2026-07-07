@@ -9,7 +9,7 @@ if '__file__' in globals():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 else:
     # Fixed based on your file tree: mcp_server sits directly at the root!
-    cml_default_mcp = "/home/cdsw/mcp_server"
+    cml_default_mcp = "/home/cdsw/ask-data/mcp_server"
     script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
     
 os.chdir(script_dir)
