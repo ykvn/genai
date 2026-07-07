@@ -22,6 +22,11 @@ def install_dependencies():
         print("⚠️ Warning: requirements.txt not found in current directory.")
 
 if __name__ == "__main__":
+    # ⚡ CPU INFERENCE OPTIMIZATION LAYER
+    # Forces PyTorch to multi-thread calculations evenly across all 4 vCPUs
+    torch.set_num_threads(4)
+    torch.set_num_interop_threads(4)
+    
     # 🛠️ Safe Path Correction Layer (Matching your backend configuration)
     if '__file__' in globals():
         script_dir = os.path.dirname(os.path.abspath(__file__))
