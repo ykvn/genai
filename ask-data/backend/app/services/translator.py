@@ -18,12 +18,13 @@ class SQLTranslationService:
         if not self.api_token:
             raise RuntimeError("CRITICAL: 'CML_TOKEN' environment variable is missing on the Backend Application.")
 
+        # 🪐 CLEAN, PROFESSIONAL AGENTIC PROMPT
         agent_system_prompt = """You are an advanced text-to-SQL translation agent for a MySQL 8.0 database.
 
 You have access to an internal Model Context Protocol (MCP) tool to read the schema definitions from disk. 
 
 AVAILABLE TOOLS:
-- `CALL: get_schema()` : Retrieves table schemas, columns, primary keys, and data relationships.
+- `get_schema` : Retrieves table schemas, columns, primary keys, and data relationships.
 
 OPERATIONAL PROTOCOL:
 1. Evaluate the user's question. If you do not have the specific table columns or layout required to answer it in your immediate chat history, respond by calling the schema tool: `CALL: get_schema()`.
@@ -33,7 +34,8 @@ OPERATIONAL PROTOCOL:
 CRITICAL SAFETY BOUNDARIES:
 - You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands."""
 
-        # Clean, un-manipulated user history thread
+        # 🎯 FORCE A CLEAN SLATE: Define 'messages' strictly as a LOCAL variable 
+        # inside this function. Never use 'self.messages' or append to a global list!
         messages = [
             {"role": "system", "content": agent_system_prompt},
             {"role": "user", "content": user_question}
@@ -42,18 +44,18 @@ CRITICAL SAFETY BOUNDARIES:
         for turn in range(3):
             payload = {
                 "model": "qwen2.5-3b-instruct",
-                "messages": messages,
+                "messages": messages, # Uses the localized, wiped conversation array
                 "temperature": 0.0
             }
 
-            # 🔒 1. Authenticated Secure Handshake to the Qwen Engine App
+            # 🔒 1. Send conversation frame to the Qwen Engine App
             try:
                 req = urllib.request.Request(
                     self.qwen_engine_url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers={
                         "Content-Type": "application/json",
-                        "Authorization": f"Bearer {self.api_token}" # 🔑 Passing the token here
+                        "Authorization": f"Bearer {self.api_token}"
                     },
                     method="POST"
                 )
@@ -65,7 +67,7 @@ CRITICAL SAFETY BOUNDARIES:
 
             print(f"🤖 [Pure MCP Agent - Turn {turn + 1}] Qwen Output:\n{ai_response}\n")
 
-            # 🛠️ FIXED INTERCEPTOR: Case-insensitive, robust phrase matching
+            # 🛠️ 2. Check if the smart model requested the tool
             if "get_schema" in ai_response.lower():
                 print("📡 Tool Invoked! Fetching layout from MCP Server via secure token channel...")
                 try:
@@ -80,7 +82,7 @@ CRITICAL SAFETY BOUNDARIES:
                 except Exception as e:
                     raise RuntimeError(f"MCP Tool Server communication failed: {str(e)}")
 
-                # Append the dialogue history and feed the true database structure into Turn 2
+                # Safe local alignment for the next step loop
                 messages.append({"role": "assistant", "content": ai_response})
                 messages.append({
                     "role": "user", 
