@@ -2,7 +2,7 @@ import os
 import sys
 
 # 🚀 Absolute path fallback designed explicitly for Cloudera AI Notebook Environments
-PROJECT_ROOT = "/home/cdsw"
+PROJECT_ROOT = "/home/cdsw/ask-data"
 MCP_SERVER_DIR = os.path.join(PROJECT_ROOT, "mcp_server")
 
 # Force Python to look directly inside mcp_server so it can find the 'app' module
