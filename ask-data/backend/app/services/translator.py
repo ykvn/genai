@@ -42,7 +42,7 @@ CRITICAL SAFETY BOUNDARIES:
         # Allow the agent up to 3 evaluation turns to trigger tools dynamically
         for turn in range(3):
             payload = {
-                "model": "qwen2.5-3b-instruct",
+                "model": "qwen2.5-1.5b-instruct",
                 "messages": messages,
                 "temperature": 0.0 # Forced determinism to eliminate hallucinations
             }
