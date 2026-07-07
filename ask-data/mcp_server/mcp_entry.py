@@ -1,13 +1,29 @@
 import os
 import sys
 
-# 🚀 Absolute path fallback designed explicitly for Cloudera AI Notebook Environments
-PROJECT_ROOT = "/home/cdsw/ask-data"
-MCP_SERVER_DIR = os.path.join(PROJECT_ROOT, "mcp_server")
+# 🔍 DYNAMIC PATH LOCATOR
+# This function crawls your environment to find the exact home of your MCP tools
+def auto_locate_mcp_server():
+    search_paths = ["/home/cdsw", "/home/cdsw/ask-data"]
+    for path in search_paths:
+        if os.path.exists(path):
+            for root, dirs, filenames in os.walk(path):
+                # Look for your specific tool file inside an mcp_server path context
+                if "sql_query.py" in filenames and "mcp_server" in root:
+                    # Strip out the trailing package structure to find the base directory containing 'app'
+                    base_mcp_dir = root.split(f"{os.sep}app{os.sep}tools")[0]
+                    
+                    # Force insert it at index 0 so it overrides any other 'app' folders
+                    if base_mcp_dir not in sys.path:
+                        sys.path.insert(0, base_mcp_dir)
+                    print(f"✅ System Path Fixed! Located MCP root at: {base_mcp_dir}")
+                    return True
+    return False
 
-# Force Python to look directly inside mcp_server so it can find the 'app' module
-if MCP_SERVER_DIR not in sys.path:
-    sys.path.insert(0, MCP_SERVER_DIR)
+# Run the locator before importing framework elements
+if not auto_locate_mcp_server():
+    print("❌ Critical: Could not automatically locate 'sql_query.py' in the workspace.")
+    print(f"Current Notebook Working Directory: {os.getcwd()}")
 
 # Core framework components
 import uvicorn
