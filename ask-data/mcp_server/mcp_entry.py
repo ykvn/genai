@@ -1,29 +1,19 @@
 import os
 import sys
 
-# 🔍 DYNAMIC PATH LOCATOR
-# This function crawls your environment to find the exact home of your MCP tools
-def auto_locate_mcp_server():
-    search_paths = ["/home/cdsw", "/home/cdsw/ask-data"]
-    for path in search_paths:
-        if os.path.exists(path):
-            for root, dirs, filenames in os.walk(path):
-                # Look for your specific tool file inside an mcp_server path context
-                if "sql_query.py" in filenames and "mcp_server" in root:
-                    # Strip out the trailing package structure to find the base directory containing 'app'
-                    base_mcp_dir = root.split(f"{os.sep}app{os.sep}tools")[0]
-                    
-                    # Force insert it at index 0 so it overrides any other 'app' folders
-                    if base_mcp_dir not in sys.path:
-                        sys.path.insert(0, base_mcp_dir)
-                    print(f"✅ System Path Fixed! Located MCP root at: {base_mcp_dir}")
-                    return True
-    return False
+# 1. 🧹 THE CACHE BUSTER
+# Clear any old references to 'app' out of the notebook's active memory
+for module_name in list(sys.modules.keys()):
+    if module_name == "app" or module_name.startswith("app."):
+        sys.modules.pop(module_name, None)
 
-# Run the locator before importing framework elements
-if not auto_locate_mcp_server():
-    print("❌ Critical: Could not automatically locate 'sql_query.py' in the workspace.")
-    print(f"Current Notebook Working Directory: {os.getcwd()}")
+# 2. Assign the exact path verified by your locator
+MCP_SERVER_DIR = "/home/cdsw/ask-data/mcp_server"
+
+# Ensure it sits at the absolute top priority of Python's search list
+if MCP_SERVER_DIR in sys.path:
+    sys.path.remove(MCP_SERVER_DIR)
+sys.path.insert(0, MCP_SERVER_DIR)
 
 # Core framework components
 import uvicorn
