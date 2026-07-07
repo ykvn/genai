@@ -3,14 +3,14 @@ import sys
 import subprocess
 
 # =====================================================================
-# 🛠️ YOUR SAFE PATH CORRECTION LAYER (Run first to set context)
+# 🛠️ SAFE PATH CORRECTION LAYER (Run first to set context)
 # =====================================================================
-if '__file__' in locals():
+if '__file__' in globals():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 else:
-    # Pointing strictly to your active mcp_server repository folder
-    cml_default_inference = "/home/cdsw/ask-data/mcp_server"
-    script_dir = cml_default_inference if os.path.exists(cml_default_inference) else os.getcwd()
+    # Fixed based on your file tree: mcp_server sits directly at the root!
+    cml_default_mcp = "/home/cdsw/mcp_server"
+    script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
     
 os.chdir(script_dir)
 if script_dir not in sys.path:
@@ -26,7 +26,7 @@ def install_dependencies():
     else:
         print("⚠️ Warning: requirements.txt not found in current directory.")
 
-# Self-heal your environment dependencies first
+# Run your environment self-healing step
 install_dependencies()
 
 # Core framework components
