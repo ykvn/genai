@@ -49,26 +49,25 @@ def execute_banking_query(sql_query: str) -> str:
     
 def get_database_schema() -> str:
     """
-    Retrieves the structural enterprise schema configuration, table layouts, 
-    available columns, and relationships from the shared domain configuration file.
+    Safely locates and reads the master domain configuration blueprint 
+    using absolute system routing paths to bypass container directory shifts.
     """
-    # Navigate up from mcp_server/app/tools/ to look for domain_config.yaml
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 🔒 Absolute enterprise path matching your repository layout
+    primary_production_path = "/home/cdsw/ask-data/backend/domain_config.yaml"
+    local_development_fallback = "../backend/domain_config.yaml"
     
-    # Try looking in the parent directory or root workspace
-    paths_to_check = [
-        os.path.join(current_dir, "..", "..", "domain_config.yaml"),
-        os.path.join(current_dir, "..", "..", "..", "domain_config.yaml"),
-        "domain_config.yaml"
-    ]
+    # Choose whichever path actively exists in the current container context
+    target_path = primary_production_path if os.path.exists(primary_production_path) else local_development_fallback
     
-    for config_path in paths_to_check:
-        normalized_path = os.path.abspath(config_path)
-        if os.path.exists(normalized_path):
-            try:
-                with open(normalized_path, "r") as f:
-                    return f.read()
-            except Exception as e:
-                return f"Error reading configuration file at {normalized_path}: {str(e)}"
-                
-    return "Error: Enterprise configuration mapping file 'domain_config.yaml' could not be located."
+    try:
+        with open(target_path, "r", encoding="utf-8") as file:
+            schema_content = file.read().strip()
+            
+        if not schema_content:
+            return "Error: The domain_config.yaml file was found but it is completely empty."
+            
+        return schema_content
+        
+    except Exception as e:
+        # Returns a detailed tracking message to identify the failure point immediately
+        return f"Error: Enterprise configuration mapping file could not be read at {target_path}. System Details: {str(e)}"
