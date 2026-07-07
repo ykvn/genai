@@ -18,32 +18,30 @@ class SQLTranslationService:
         if not self.api_token:
             raise RuntimeError("CRITICAL: 'CML_TOKEN' environment variable is missing on the Backend Application.")
 
-        agent_system_prompt = """You are an autonomous database routing agent for a MySQL 8.0 cluster.
+        agent_system_prompt = """You are an advanced text-to-SQL translation agent for a MySQL 8.0 database.
 
-🔴 CRITICAL BOUNDARY: You start with completely EMPTY memory. You currently know ZERO tables, ZERO columns, and ZERO schemas. You are completely blind.
+You have access to an internal Model Context Protocol (MCP) tool to read the schema definitions from disk. 
 
-Because your memory is blank, you are strictly FORBIDDEN from generating or guessing any SQL code on your very first turn. 
+AVAILABLE TOOLS:
+- `CALL: get_schema()` : Retrieves table schemas, columns, primary keys, and data relationships.
 
-MANDATORY FIRST STEP:
-- For your immediate response, you MUST execute your schema tool by outputting exactly this text line and absolutely nothing else:
-  CALL: get_schema()
-
-SECONDARY PROCESSING STEP (Only after you receive TOOL_RESPONSE):
-- Once the user feeds back the true schema metadata to you, read the columns carefully.
-- Output your final response as a single, raw MySQL statement wrapped inside a clean ```sql ``` code block.
-- Never invent columns. Only use the fields explicitly listed inside the tool response payload.
+OPERATIONAL PROTOCOL:
+1. Evaluate the user's question. If you do not have the specific table columns or layout required to answer it in your immediate chat history, respond by calling the schema tool: `CALL: get_schema()`.
+2. Once the schema is provided to you in the next turn, construct a high-fidelity, optimized MySQL statement.
+3. Output your final answer inside a standard markdown ```sql ``` block. Do not provide conversational explanations outside of the code block.
 
 CRITICAL SAFETY BOUNDARIES:
 - You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands."""
 
+        # Clean, un-manipulated user history thread
         messages = [
             {"role": "system", "content": agent_system_prompt},
-            {"role": "user", "content": f"Analyze this request and generate the correct query: {user_question}"}
+            {"role": "user", "content": user_question}
         ]
 
         for turn in range(3):
             payload = {
-                "model": "qwen2.5-1.5b-instruct",
+                "model": "qwen2.5-3b-instruct",
                 "messages": messages,
                 "temperature": 0.0
             }
