@@ -65,14 +65,13 @@ CRITICAL SAFETY BOUNDARIES:
 
             print(f"🤖 [Pure MCP Agent - Turn {turn + 1}] Qwen Output:\n{ai_response}\n")
 
-            if "CALL: get_schema()" in ai_response:
+            # 🛠️ FIXED INTERCEPTOR: Case-insensitive, robust phrase matching
+            if "get_schema" in ai_response.lower():
                 print("📡 Tool Invoked! Fetching layout from MCP Server via secure token channel...")
-                
-                # 🔒 2. Authenticated Secure Handshake to the MCP Server App
                 try:
                     schema_req = urllib.request.Request(
                         f"{self.mcp_server_url}/api/test/schema",
-                        headers={"Authorization": f"Bearer {self.api_token}"}, # 🔑 Passing the token here
+                        headers={"Authorization": f"Bearer {self.api_token}"},
                         method="GET"
                     )
                     with urllib.request.urlopen(schema_req, timeout=5) as schema_resp:
@@ -81,13 +80,15 @@ CRITICAL SAFETY BOUNDARIES:
                 except Exception as e:
                     raise RuntimeError(f"MCP Tool Server communication failed: {str(e)}")
 
+                # Append the dialogue history and feed the true database structure into Turn 2
                 messages.append({"role": "assistant", "content": ai_response})
                 messages.append({
                     "role": "user", 
-                    "content": f"TOOL_RESPONSE (get_schema):\n{schema_context}\n\nReview this data and generate your final raw MySQL statement inside ```sql wrappers."
+                    "content": f"TOOL_RESPONSE (get_schema):\n{schema_context}\n\nReview this schema and execute Step 2 and Step 3 of your protocol."
                 })
                 continue
 
+            # 🏁 3. Extract final SQL asset when generated
             if "```sql" in ai_response:
                 generated_sql = ai_response.split("```sql")[1].split("```")[0].strip()
                 return generated_sql
