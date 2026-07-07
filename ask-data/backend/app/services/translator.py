@@ -22,14 +22,28 @@ class SQLTranslationService:
         except Exception as e:
             raise RuntimeError(f"MCP Tool Server Application at port 8090 is unreachable: {str(e)}")
 
-        # 2. Package the schema and send it to the standalone Qwen Engine Application
+        # 🧠 1.5B MODEL SCAFFOLDING: Frame the raw YAML with strict behavioral boundaries
+        instructional_system_prompt = f"""You are a strict read-only Text-to-SQL translation assistant for a MySQL 8.0 database.
+You must transform natural language questions into perfectly executable SQL statements.
+
+Here is the authoritative database schema layout you MUST follow:
+{system_context}
+
+CRITICAL EXECUTION RULES:
+1. You are strictly forbidden from generating INSERT, UPDATE, DELETE, or DROP commands.
+2. If a user asks to modify or update data, do NOT write an UPDATE query. Instead, return a SELECT query targeting the relevant rows.
+3. Use ONLY columns and tables explicitly listed in the schema definitions above.
+4. Pay attention to specific column names: use 'bank_name', NEVER use 'bank'.
+5. Output ONLY the raw SQL query. Do not include markdown blocks, text descriptions, or conversational prose."""
+
+        # 2. Package the structured prompt and send it to the standalone Qwen Engine Application
         payload = {
             "model": "qwen2.5-1.5b-instruct",
             "messages": [
-                {"role": "system", "content": system_context},
-                {"role": "user", "content": f"Translate this question into a raw MySQL SELECT query. Do not include markdown wraps or explanations: {user_question}"}
+                {"role": "system", "content": instructional_system_prompt},
+                {"role": "user", "content": f"Translate this question into a single valid MySQL statement: {user_question}"}
             ],
-            "temperature": 0.0
+            "temperature": 0.0  # Kept at 0.0 to guarantee deterministic, non-hallucinated queries
         }
 
         try:
