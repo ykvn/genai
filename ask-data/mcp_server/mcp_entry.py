@@ -1,16 +1,18 @@
 import os
 import sys
 
-# 🛠️ Dynamically force Python to look inside the mcp_server directory for the 'app' module
-current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-    
+# 🚀 Absolute path fallback designed explicitly for Cloudera AI Notebook Environments
+PROJECT_ROOT = "/home/cdsw"
+MCP_SERVER_DIR = os.path.join(PROJECT_ROOT, "mcp_server")
+
+# Force Python to look directly inside mcp_server so it can find the 'app' module
+if MCP_SERVER_DIR not in sys.path:
+    sys.path.insert(0, MCP_SERVER_DIR)
+
+# Core framework components
+import uvicorn
 from fastapi import FastAPI, Request
 from starlette.routing import Mount
-import uvicorn
-
-# Core FastMCP and Server-Sent Events protocol components
 from fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 
