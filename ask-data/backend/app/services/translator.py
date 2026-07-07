@@ -32,9 +32,7 @@ OPERATIONAL INSTRUCTIONS:
 - Output your final response as a single, raw MySQL statement wrapped inside a clean ```sql ``` code block. Do not write text explanations outside the code block once you have your answer.
 
 CRITICAL SAFETY BOUNDARIES:
-- You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands.
-- Only reference column names explicitly defined in the tool output (e.g., use 'bank_name', NEVER use 'bank').
-- To show active customers, you MUST INNER JOIN 'customers' with 'savings' and filter WHERE savings.status = 'ACTIVE'."""
+- You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands."""
 
         messages = [
             {"role": "system", "content": agent_system_prompt},
