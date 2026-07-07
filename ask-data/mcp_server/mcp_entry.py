@@ -1,19 +1,33 @@
 import os
 import sys
+import subprocess
 
-# 1. 🧹 THE CACHE BUSTER
-# Clear any old references to 'app' out of the notebook's active memory
-for module_name in list(sys.modules.keys()):
-    if module_name == "app" or module_name.startswith("app."):
-        sys.modules.pop(module_name, None)
+# =====================================================================
+# 🛠️ YOUR SAFE PATH CORRECTION LAYER (Run first to set context)
+# =====================================================================
+if '__file__' in locals():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+else:
+    # Pointing strictly to your active mcp_server repository folder
+    cml_default_inference = "/home/cdsw/ask-data/mcp_server"
+    script_dir = cml_default_inference if os.path.exists(cml_default_inference) else os.getcwd()
+    
+os.chdir(script_dir)
+if script_dir not in sys.path:
+    sys.path.insert(0, script_dir)
 
-# 2. Assign the exact path verified by your locator
-MCP_SERVER_DIR = "/home/cdsw/ask-data/mcp_server"
+def install_dependencies():
+    """Automatically installs packages from requirements.txt on startup"""
+    requirements_path = "requirements.txt"
+    if os.path.exists(requirements_path):
+        print("📦 Found requirements.txt. Ensuring all server dependencies are installed...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
+        print("✅ Dependencies up to date.")
+    else:
+        print("⚠️ Warning: requirements.txt not found in current directory.")
 
-# Ensure it sits at the absolute top priority of Python's search list
-if MCP_SERVER_DIR in sys.path:
-    sys.path.remove(MCP_SERVER_DIR)
-sys.path.insert(0, MCP_SERVER_DIR)
+# Self-heal your environment dependencies first
+install_dependencies()
 
 # Core framework components
 import uvicorn
