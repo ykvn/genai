@@ -10,67 +10,89 @@ class SQLTranslationService:
 
     def generate_sql(self, user_question: str) -> str:
         """
-        Acts as the MCP Host Client. It fetches the schema context from your Tool App,
-        hands it to your Qwen App to get the SQL statement, and returns it to main.py.
+        Pure MCP Agent Router. It exposes a tool matrix to Qwen and manages
+        a dynamic execution loop based on the model's operational requests.
         """
-        # 1. Pull the live database schema from the MCP Tool Server Application
-        try:
-            schema_req = urllib.request.Request(f"{self.mcp_server_url}/api/test/schema")
-            with urllib.request.urlopen(schema_req, timeout=5) as response:
-                schema_data = json.loads(response.read().decode("utf-8"))
-                system_context = schema_data.get("raw_yaml_configuration", "")
-        except Exception as e:
-            raise RuntimeError(f"MCP Tool Server Application at port 8090 is unreachable: {str(e)}")
+        
+        # 🧠 1. Define the authoritative tool menu and formatting contract for the 3B model
+        agent_system_prompt = """You are an autonomous database routing agent for a MySQL 8.0 cluster. 
+You do not have the data schema memorized. You must interact with your available Model Context Protocol (MCP) tools to discover information before outputting code.
 
-        # Concise instruction set optimized for a 1.5B model
-        instructional_system_prompt = f"""You are a strict read-only Text-to-SQL engine for a MySQL 8.0 database.
-You must transform user requests into executable SQL code blocks.
+AVAILABLE MCP TOOLS:
+1. Name: `get_schema()`
+   Description: Connects to the local filesystem and reads the master 'domain_config.yaml' file containing table metrics, columns, aliases, and active state rules.
 
-Here is your schema metadata:
-{system_context}
+OPERATIONAL INSTRUCTIONS:
+- If you do not know the exact column names, table links, or active state rules needed for a query, you MUST request the schema by writing exactly:
+  CALL: get_schema()
+- Once you receive the tool response with the schema text layout, process the table properties carefully.
+- Output your final response as a single, raw MySQL statement wrapped inside a clean ```sql ``` code block. Do not write text explanations outside the code block once you have your answer.
 
-CRITICAL: The 'customers' table does NOT have a 'status' column. To find active customers, you MUST join with the 'savings' table."""
+CRITICAL SAFETY BOUNDARIES:
+- You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands.
+- Only reference column names explicitly defined in the tool output (e.g., use 'bank_name', NEVER use 'bank').
+- To show active customers, you MUST INNER JOIN 'customers' with 'savings' and filter WHERE savings.status = 'ACTIVE'."""
 
-        # 🧠 FEW-SHOT INSTRUCTION LAYER: Train the 1.5B model with explicit pairs
-        payload = {
-            "model": "qwen2.5-1.5b-instruct",
-            "messages": [
-                {"role": "system", "content": instructional_system_prompt},
-                
-                # Example 1: Resolving the "active customers" schema limitation
-                {"role": "user", "content": "Translate this question into a single valid MySQL statement: show active customers"},
-                {"role": "assistant", "content": "SELECT c.* FROM customers c INNER JOIN savings s ON c.customer_id = s.customer_id WHERE s.status = 'ACTIVE';"},
-                
-                # Example 2: Resolving specific bank filters
-                {"role": "user", "content": "Translate this question into a single valid MySQL statement: Show me active customers where bank_name is BNI"},
-                {"role": "assistant", "content": "SELECT c.* FROM customers c INNER JOIN savings s ON c.customer_id = s.customer_id WHERE c.bank_name = 'BNI' AND s.status = 'ACTIVE';"},
-                
-                # Example 3: Blocking data modification actions safely
-                {"role": "user", "content": "Translate this question into a single valid MySQL statement: Update customers from bank BNI"},
-                {"role": "assistant", "content": "SELECT * FROM customers WHERE bank_name = 'BNI';"},
-                
-                # The real, live incoming question
-                {"role": "user", "content": f"Translate this question into a single valid MySQL statement: {user_question}"}
-            ],
-            "temperature": 0.0  # Keep it perfectly deterministic
-        }
+        # 🔄 Initialize conversation history thread
+        messages = [
+            {"role": "system", "content": agent_system_prompt},
+            {"role": "user", "content": f"Analyze this request and generate the correct query: {user_question}"}
+        ]
 
-        try:
-            req = urllib.request.Request(
-                self.qwen_engine_url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json"},
-                method="POST"
-            )
-            # 🔄 CHANGE TIMEOUT FROM 10 TO 60 SECONDS
-            with urllib.request.urlopen(req, timeout=60) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                generated_sql = result["choices"][0]["message"]["content"].strip()
-                
-                # Clean up any accidental markdown wrappers
-                if generated_sql.startswith("```"):
-                    generated_sql = generated_sql.replace("```sql", "").replace("```", "").strip()
-                
+        # Allow the agent up to 3 evaluation turns to trigger tools dynamically
+        for turn in range(3):
+            payload = {
+                "model": "qwen2.5-3b-instruct",
+                "messages": messages,
+                "temperature": 0.0 # Forced determinism to eliminate hallucinations
+            }
+
+            # Ship conversational frame to your Qwen engine container
+            try:
+                req = urllib.request.Request(
+                    self.qwen_engine_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                    ai_response = result["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                raise RuntimeError(f"Qwen Engine Server at port 8001 is unreachable: {str(e)}")
+
+            # 🔍 Log the agent's internal thought stream directly to your backend stdout terminal
+            print(f"🤖 [Pure MCP Agent - Turn {turn + 1}] Qwen Output:\n{ai_response}\n")
+
+            # INTERCEPT ACTION 1: Check if the model is calling the schema tool
+            if "CALL: get_schema()" in ai_response:
+                print("📡 Tool Invoked! Fetching structural layout from MCP Server Application...")
+                try:
+                    schema_req = urllib.request.Request(f"{self.mcp_server_url}/api/test/schema")
+                    with urllib.request.urlopen(schema_req, timeout=5) as schema_resp:
+                        schema_data = json.loads(schema_resp.read().decode("utf-8"))
+                        schema_context = schema_data.get("raw_yaml_configuration", "")
+                except Exception as e:
+                    raise RuntimeError(f"MCP Tool Server failed during dynamic tool call: {str(e)}")
+
+                # Update the conversational chain with the tool trigger and the real data response
+                messages.append({"role": "assistant", "content": ai_response})
+                messages.append({
+                    "role": "user", 
+                    "content": f"TOOL_RESPONSE (get_schema):\n{schema_context}\n\nReview this data and generate your final raw MySQL statement inside ```sql wrappers."
+                })
+                # Re-loop: The model will read this data on the very next turn!
+                continue
+
+            # INTERCEPT ACTION 2: The model has processed the context and generated the final SQL asset
+            if "```sql" in ai_response:
+                generated_sql = ai_response.split("```sql")[1].split("```")[0].strip()
                 return generated_sql
-        except Exception as e:
-            raise RuntimeError(f"Qwen Engine Server Application at port 8001 is unreachable: {str(e)}")
+            elif "SELECT" in ai_response.upper():
+                # Safe fallback configuration if the model omits markdown wraps but writes clean code
+                return ai_response.replace("```", "").strip()
+            
+            # Catch-all if the model returns an error narrative or blocks a write query
+            return ai_response
+
+        raise RuntimeError("Agent Loop Error: Max execution turns exceeded without resolving a statement.")
