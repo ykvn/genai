@@ -32,7 +32,11 @@ OPERATIONAL PROTOCOL:
 3. Output your final answer inside a standard markdown ```sql ``` block. Do not provide conversational explanations outside of the code block.
 
 CRITICAL SAFETY BOUNDARIES:
-- You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands."""
+- You are strictly forbidden from writing INSERT, UPDATE, DELETE, or DROP commands.
+- If a user requests a forbidden command (like deleting data or dropping tables), you MUST immediately abort your protocol and output exactly this dummy safety statement inside your markdown wrapper:
+```sql
+SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_status;
+``` """
 
         # 🎯 FORCE A CLEAN SLATE: Define 'messages' strictly as a LOCAL variable 
         # inside this function. Never use 'self.messages' or append to a global list!
