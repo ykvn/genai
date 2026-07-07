@@ -84,7 +84,6 @@ if __name__ == "__main__":
 
     @app.post("/v1/chat/completions")
     def generate_sql_on_cpu(payload: OpenAIPayload):
-        """Natively unpacks your translator's OpenAI messages payload on CPU threads"""
         system_prompt = ""
         user_question = ""
         
@@ -93,6 +92,11 @@ if __name__ == "__main__":
                 system_prompt = msg.content
             elif msg.role == "user":
                 user_question = msg.content
+
+        # 🔍 THE SMOKING GUN SENSOR: Print this to your Qwen Application logs
+        print("\n=== 🚨 INCOMING SYSTEM CONTEXT RECEIVED BY QWEN ===")
+        print(system_prompt)
+        print("==================================================\n")
 
         formatted_messages = [
             {"role": "system", "content": system_prompt},
