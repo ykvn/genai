@@ -3,18 +3,32 @@ import sys
 import subprocess
 
 # =====================================================================
-# 🛠️ SAFE PATH CORRECTION LAYER (Run first to set context)
+# 🛠️ ULTRA-ROBUST PATH CORRECTION & JUPYTER MEMORY PURGE
 # =====================================================================
-if '__file__' in globals():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-else:
-    # Fixed based on your file tree: mcp_server sits directly at the root!
-    cml_default_mcp = "/home/cdsw/ask-data/mcp_server"
-    script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
-    
+# 1. Smart Path Net: Checks both possible Cloudera workspace locations
+candidate_paths = [
+    "/home/cdsw/ask-data/mcp_server",
+    "/home/cdsw/mcp_server"
+]
+script_dir = next((p for p in candidate_paths if os.path.exists(p)), os.getcwd())
+
+# Shift Python's active directory focus
 os.chdir(script_dir)
+
+# 2. Evict any old backend paths from Python's active search array
+sys.path = [p for p in sys.path if "backend" not in p]
+
+# 3. Force your fresh mcp_server path to the absolute top priority
 if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
+
+# 4. 🔥 THE CACHE PURGE: Wipe the notebook's memory of the backend 'app'
+# This forces Python to look at the disk instead of pulling from ghost memory
+for module_name in list(sys.modules.keys()):
+    if module_name == "app" or module_name.startswith("app."):
+        sys.modules.pop(module_name, None)
+
+print(f"🧹 Notebook memory purged. Now pointing strictly to: {os.getcwd()}")
 
 def install_dependencies():
     """Automatically installs packages from requirements.txt on startup"""
@@ -26,7 +40,7 @@ def install_dependencies():
     else:
         print("⚠️ Warning: requirements.txt not found in current directory.")
 
-# Run your environment self-healing step
+# Self-heal your environment packages
 install_dependencies()
 
 # Core framework components
