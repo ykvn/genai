@@ -22,28 +22,37 @@ class SQLTranslationService:
         except Exception as e:
             raise RuntimeError(f"MCP Tool Server Application at port 8090 is unreachable: {str(e)}")
 
-        # 🧠 1.5B MODEL SCAFFOLDING: Frame the raw YAML with strict behavioral boundaries
-        instructional_system_prompt = f"""You are a strict read-only Text-to-SQL translation assistant for a MySQL 8.0 database.
-You must transform natural language questions into perfectly executable SQL statements.
+        # Concise instruction set optimized for a 1.5B model
+        instructional_system_prompt = f"""You are a strict read-only Text-to-SQL engine for a MySQL 8.0 database.
+You must transform user requests into executable SQL code blocks.
 
-Here is the authoritative database schema layout you MUST follow:
+Here is your schema metadata:
 {system_context}
 
-CRITICAL EXECUTION RULES:
-1. You are strictly forbidden from generating INSERT, UPDATE, DELETE, or DROP commands.
-2. If a user asks to modify or update data, do NOT write an UPDATE query. Instead, return a SELECT query targeting the relevant rows.
-3. Use ONLY columns and tables explicitly listed in the schema definitions above.
-4. Pay attention to specific column names: use 'bank_name', NEVER use 'bank'.
-5. Output ONLY the raw SQL query. Do not include markdown blocks, text descriptions, or conversational prose."""
+CRITICAL: The 'customers' table does NOT have a 'status' column. To find active customers, you MUST join with the 'savings' table."""
 
-        # 2. Package the structured prompt and send it to the standalone Qwen Engine Application
+        # 🧠 FEW-SHOT INSTRUCTION LAYER: Train the 1.5B model with explicit pairs
         payload = {
             "model": "qwen2.5-1.5b-instruct",
             "messages": [
                 {"role": "system", "content": instructional_system_prompt},
+                
+                # Example 1: Resolving the "active customers" schema limitation
+                {"role": "user", "content": "Translate this question into a single valid MySQL statement: show active customers"},
+                {"role": "assistant", "content": "SELECT c.* FROM customers c INNER JOIN savings s ON c.customer_id = s.customer_id WHERE s.status = 'ACTIVE';"},
+                
+                # Example 2: Resolving specific bank filters
+                {"role": "user", "content": "Translate this question into a single valid MySQL statement: Show me active customers where bank_name is BNI"},
+                {"role": "assistant", "content": "SELECT c.* FROM customers c INNER JOIN savings s ON c.customer_id = s.customer_id WHERE c.bank_name = 'BNI' AND s.status = 'ACTIVE';"},
+                
+                # Example 3: Blocking data modification actions safely
+                {"role": "user", "content": "Translate this question into a single valid MySQL statement: Update customers from bank BNI"},
+                {"role": "assistant", "content": "SELECT * FROM customers WHERE bank_name = 'BNI';"},
+                
+                # The real, live incoming question
                 {"role": "user", "content": f"Translate this question into a single valid MySQL statement: {user_question}"}
             ],
-            "temperature": 0.0  # Kept at 0.0 to guarantee deterministic, non-hallucinated queries
+            "temperature": 0.0  # Keep it perfectly deterministic
         }
 
         try:
