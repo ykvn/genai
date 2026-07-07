@@ -142,15 +142,32 @@ def test_rag_tool(search_query: str):
     return {"status": "success", "matched_context": perform_rag_search(search_query)}
 
 if __name__ == "__main__":
-    # Follow the dedicated application port assigned by Cloudera AI
-    app_port = int(os.getenv("CDSW_APP_PORT", 8090))
+    # Dynamically match the custom port from your environment logs
+    app_port = int(os.getenv("CDSW_APP_PORT", 8100))
     
-    print(f"🌐 Launching Production MCP Server on http://localhost:{app_port}")
-    print(f"📡 Serving protocol streams on http://localhost:{app_port}/sse")
-    
-    uvicorn.run(
+    # Configure Uvicorn programmatically while locking down localhost
+    config = uvicorn.Config(
         app, 
         host="localhost",  # 🔒 Locked strictly to localhost per enterprise guidelines
         port=app_port, 
         log_level="info"
     )
+    server = uvicorn.Server(config)
+    
+    try:
+        import asyncio
+        # Check if an event loop is already running (Jupyter Notebook environment)
+        loop = asyncio.get_running_loop()
+        
+        # Launch the server as a background task inside the notebook's active loop
+        loop.create_task(server.serve())
+        
+        print(f"\n🌐 Production MCP Server launched on http://localhost:{app_port}")
+        print(f"📡 Serving protocol streams on http://localhost:{app_port}/sse")
+        print("⚡ Notebook Event Loop detected! Server running seamlessly in the background.")
+        print("👉 Your cell is unfrozen. You can now use the server or run tests freely!")
+
+    except RuntimeError:
+        # Fallback for standard command-line deployment (when no loop exists yet)
+        import asyncio
+        asyncio.run(server.serve())
