@@ -57,7 +57,7 @@ CRITICAL SAFETY BOUNDARIES:
                     },
                     method="POST"
                 )
-                with urllib.request.urlopen(req, timeout=30) as response:
+                with urllib.request.urlopen(req, timeout=90) as response:
                     result = json.loads(response.read().decode("utf-8"))
                     ai_response = result["choices"][0]["message"]["content"].strip()
             except Exception as e:
