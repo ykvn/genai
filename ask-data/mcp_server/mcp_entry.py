@@ -1,5 +1,11 @@
 import os
 import sys
+
+# 🛠️ Dynamically force Python to look inside the mcp_server directory for the 'app' module
+current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+    
 from fastapi import FastAPI, Request
 from starlette.routing import Mount
 import uvicorn
