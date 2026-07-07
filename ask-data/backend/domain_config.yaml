@@ -6,7 +6,12 @@ database_name: "bank_abc_analytics"
 
 tables:
   customers:
-    description: "Contains core customer demographic profiles. Use this for identity, names, contact emails, age, birthdays, and checking bank affiliation."
+    # 🔥 CRITICAL GUARDRAIL INJECTED DIRECTLY HERE
+    description: |
+      Contains core customer demographic profiles. 
+      CRITICAL: This table does NOT have a 'status' column. If a user asks for 'active' customers, 
+      you MUST INNER JOIN the 'savings' table on customer_id and filter WHERE savings.status = 'ACTIVE'. 
+      NEVER append 'WHERE status = ...' directly to this table.
     columns:
       customer_id:
         type: "INT"
@@ -184,13 +189,8 @@ common_rules:
     birthday_this_week: "WHERE WEEK(birth_date) = WEEK(CURDATE())"
     approaching_maturity: "WHERE maturity_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)"
   
-  # 🔒 FIXED: Restrict the status filter to tables that actually possess the column
-  active_records: |
-    Only append status = 'ACTIVE' filters to tables that explicitly contain a 'status' column 
-    (such as savings, deposits, loans, or credit_cards). 
-    The core 'customers' table does NOT have a status column; if a query asks for active customers, 
-    either filter strictly by their account statuses using an INNER JOIN on the savings table, 
-    or omit the status filter entirely if only querying the demographic table.
+  # 🔒 SIMPLIFIED: Bulletproof instruction layout for the model
+  active_records: "Only apply status = 'ACTIVE' filters to the savings, deposits, loans, or credit_cards tables. Do NOT apply it to the customers table."
 
   security_guardrails:
     max_limit: "Always append 'LIMIT 100' to select queries if no explicit limit is requested by the user to protect system memory."
