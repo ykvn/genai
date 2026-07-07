@@ -46,3 +46,29 @@ def execute_banking_query(sql_query: str) -> str:
             
     except Exception as e:
         return f"Database Execution Error: {str(e)}"
+    
+def get_database_schema() -> str:
+    """
+    Retrieves the structural enterprise schema configuration, table layouts, 
+    available columns, and relationships from the shared domain configuration file.
+    """
+    # Navigate up from mcp_server/app/tools/ to look for domain_config.yaml
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Try looking in the parent directory or root workspace
+    paths_to_check = [
+        os.path.join(current_dir, "..", "..", "domain_config.yaml"),
+        os.path.join(current_dir, "..", "..", "..", "domain_config.yaml"),
+        "domain_config.yaml"
+    ]
+    
+    for config_path in paths_to_check:
+        normalized_path = os.path.abspath(config_path)
+        if os.path.exists(normalized_path):
+            try:
+                with open(normalized_path, "r") as f:
+                    return f.read()
+            except Exception as e:
+                return f"Error reading configuration file at {normalized_path}: {str(e)}"
+                
+    return "Error: Enterprise configuration mapping file 'domain_config.yaml' could not be located."

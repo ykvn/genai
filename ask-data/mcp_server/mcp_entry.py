@@ -18,6 +18,17 @@ sse = SseServerTransport("/messages")
 # Dynamically register your standalone tool function into the FastMCP instance
 from app.tools.sql_query import execute_banking_query
 
+# Dynamically register your schema mapping tool into the FastMCP instance
+from app.tools.sql_query import get_database_schema
+
+@mcp.tool(name="get_database_schema")
+def mcp_get_database_schema() -> str:
+    """
+    Retrieves the structural enterprise schema configuration, table layouts, 
+    available columns, column types, primary/foreign keys, and data relationships.
+    """
+    return get_database_schema()
+
 @mcp.tool(name="execute_banking_query")
 def mcp_execute_banking_query(sql_query: str) -> str:
     """
@@ -76,6 +87,34 @@ async def handle_sse_handshake(request: Request):
             streams[0], streams[1], mcp._mcp_server.create_initialization_options()
         )
 
+# =====================================================================
+# 🧪 SWAGGER DOCS INTERACTIVE TESTING ENDPOINTS
+# =====================================================================
+
+@app.get("/api/test/schema")
+def test_schema_tool():
+    """Interactive playground to test your get_database_schema tool"""
+    from app.tools.sql_query import get_database_schema
+    return {"raw_yaml_configuration": get_database_schema()}
+
+@app.post("/api/test/sql")
+def test_sql_tool(mysql_query: str):
+    """Interactive playground to test your execute_banking_query tool"""
+    from app.tools.sql_query import execute_banking_query
+    import json
+    raw_result = execute_banking_query(mysql_query)
+    try:
+        # Try to parse it into clean JSON if it's database rows
+        return {"status": "success", "data": json.loads(raw_result)}
+    except:
+        # Return as raw text if it's an error message or string guardrail
+        return {"status": "info_or_error", "message": raw_result}
+
+@app.post("/api/test/rag")
+def test_rag_tool(search_query: str):
+    """Interactive playground to test your search_policy_knowledge_base tool"""
+    from app.tools.rag_search import perform_rag_search
+    return {"status": "success", "matched_context": perform_rag_search(search_query)}
 
 if __name__ == "__main__":
     # Follow the dedicated application port assigned by Cloudera AI
