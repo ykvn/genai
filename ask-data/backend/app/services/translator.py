@@ -96,6 +96,7 @@ SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_statu
                 "temperature": 0.0
             }
 
+            print(f"⏳ [AGENT ROUTER - Turn {turn + 1}] Packing conversation payload and executing Qwen completion phase...")
             try:
                 req = urllib.request.Request(
                     self.qwen_engine_url,
@@ -109,21 +110,40 @@ SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_statu
             except Exception as e:
                 raise RuntimeError(f"Failed to communicate with Qwen Engine App: {str(e)}")
 
-            print(f"🤖 [Pure MCP Agent - Turn {turn + 1}] Qwen Output:\n{ai_response}\n")
+            print(f"🤖 [AGENT ROUTER - Turn {turn + 1}] Captured Raw Qwen Model Output:\n{ai_response}\n")
 
-            # Check if the smart model explicitly calls the schema discovery tool
+            # 🛠️ HIGH-VISIBILITY MCP ROUTING LOGS INJECTED HERE
             if "get_schema" in ai_response.lower():
-                print("📡 Tool Invoked! Fetching layout from MCP Server via secure token channel...")
+                target_mcp_endpoint = f"{self.mcp_server_url}/api/test/schema"
+                
+                print("=====================================================================")
+                print("📡  MCP TOOL INVOCATION DETECTED!")
+                print(f"🔗  Routing Target URL : {target_mcp_endpoint}")
+                print(f"🔑  Authorization Auth  : Bearer {self.api_token[:10]}...[REDACTED]")
+                print("=====================================================================")
+                
                 try:
                     schema_req = urllib.request.Request(
-                        f"{self.mcp_server_url}/api/test/schema",
+                        target_mcp_endpoint,
                         headers={"Authorization": f"Bearer {self.api_token}"},
                         method="GET"
                     )
+                    
+                    start_time = time.time()
                     with urllib.request.urlopen(schema_req, timeout=5) as schema_resp:
                         schema_data = json.loads(schema_resp.read().decode("utf-8"))
                         schema_context = schema_data.get("raw_yaml_configuration", "")
+                    elapsed_time = time.time() - start_time
+                    
+                    print(f"✅  MCP RESPONSE RECEIVED SUCCESSFULLY ({elapsed_time:.2f}s)")
+                    print(f"📦  Payload Metrics: Extracted {len(schema_context)} characters of raw structural YAML schema context.")
+                    print("=====================================================================\n")
+                    
                 except Exception as e:
+                    print("❌  CRITICAL MCP ROUTING FAILURE!")
+                    print(f"💥  Failed Connection Attempt to Endpoint: {target_mcp_endpoint}")
+                    print(f"📝  Network Error Trace: {str(e)}")
+                    print("=====================================================================\n")
                     raise RuntimeError(f"MCP Tool Server communication failed: {str(e)}")
 
                 messages.append({"role": "assistant", "content": ai_response})
@@ -136,10 +156,13 @@ SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_statu
             # Extract the pure query string from the markdown blocks
             if "```sql" in ai_response:
                 generated_sql = ai_response.split("```sql")[1].split("```")[0].strip()
+                print(f"🏁  [AGENT ROUTER] Final Code Asset Resolved: Clean Markdown Extraction Found.")
                 return generated_sql
             elif "SELECT" in ai_response.upper():
+                print(f"🏁  [AGENT ROUTER] Final Code Asset Resolved: Fallback Native Text Extraction Found.")
                 return ai_response.replace("```", "").strip()
             
+            print(f"🏁  [AGENT ROUTER] Loop complete. Handing text asset fallback downstream.")
             return ai_response
 
         raise RuntimeError("Agent Loop Error: Max execution turns exceeded without resolving a statement.")
