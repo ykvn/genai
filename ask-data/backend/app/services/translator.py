@@ -1,6 +1,7 @@
 import os
 import json
 import urllib.request
+import time
 
 # 🩹 ENTERPRISE LINUX RUNTIME PATCH: Force modern SQLite layers before importing ChromaDB
 try:
