@@ -7,7 +7,7 @@ from app.database import get_db, SessionLocal
 from app.schemas.query import QueryRequest
 from app.services.translator import SQLTranslationService
 
-# --- NEW: Model Context Protocol Protocol Ecosystem imports ---
+# --- Model Context Protocol Ecosystem imports ---
 from mcp.server.fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 from starlette.routing import Mount
@@ -15,9 +15,23 @@ from starlette.routing import Mount
 app = FastAPI(title="Bank ABC NL-to-SQL Core API")
 translator_service = SQLTranslationService()
 
-# 1. Initialize the official FastMCP Server Interface
+# Initialize the official FastMCP Server Interface
 mcp = FastMCP("Bank-ABC-Analytics-Engine")
 sse = SseServerTransport("/messages")
+
+
+def is_policy_question(question: str) -> bool:
+    """
+    Heuristic Intent Classifier: Evaluates keywords to determine whether a query
+    is a document/policy request (RAG) or an analytical database request (SQL).
+    """
+    q_lower = question.lower()
+    # Comprehensive routing keywords matching your deployment manual guidelines
+    rag_keywords = [
+        "kebijakan", "sop", "prosedur", "manual", "panduan", "kriteria", 
+        "aturan", "regulasi", "dokumen", "syarat", "sk", "surat keputusan"
+    ]
+    return any(keyword in q_lower for keyword in rag_keywords)
 
 
 # =====================================================================
@@ -30,7 +44,6 @@ def get_database_schema() -> str:
     Retrieves the structural enterprise schema configuration, table layouts, 
     available columns, column types, primary/foreign keys, and data relationships.
     """
-    # Dynamically maps back to your existing domain config file
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "domain_config.yaml")
     try:
@@ -49,10 +62,8 @@ def execute_banking_query(sql_query: str) -> str:
     through the secure tunnel and returns rows as formatted JSON text.
     Only SELECT queries are authorized.
     """
-    # Clean up markdown formatting blocks if added by the LLM client
     query = sql_query.strip().replace("```sql", "").replace("```", "").strip()
     
-    # Direct security guardrail check
     if not query.lower().startswith("select"):
         return "Security Violation: Non-SELECT mutations are strictly blocked."
         
@@ -65,6 +76,19 @@ def execute_banking_query(sql_query: str) -> str:
         return f"Database Execution Error: {str(e)}"
     finally:
         db.close()
+
+
+@mcp.tool()
+def search_policy_documents(query: str) -> str:
+    """
+    Performs a semantic vector distance search against local persistent enterprise manuals 
+    and policy documentation (ChromaDB) to return matching structural context fragments.
+    """
+    try:
+        context_fragments = translator_service.retrieve_relevant_documents(query, top_k=2)
+        return context_fragments
+    except Exception as e:
+        return f"Knowledge Base Vector Retrieval Failure: {str(e)}"
 
 
 # =====================================================================
@@ -89,30 +113,61 @@ def health_check(db: Session = Depends(get_db)):
 @app.post("/ask")
 def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
     """
-    Processes natural language questions, translates them to SQL, 
-    and executes the query against the database to return real live records.
+    Processes natural language questions, automatically splits routing lines 
+    between document policies (RAG) and relational transactions (SQL), 
+    and handles output payload assembly.
     """
     try:
         user_question = payload.question
         
-        # 1. Translate the English question into a SQL query string
-        generated_sql = translator_service.generate_sql(user_question)
+        # 📑 PATH B: Document / Policy / SOP Intent Detected
+        if is_policy_question(user_question):
+            print(f"📚 Policy Inquiry Intercepted. Triggering Local Vector Store Retrieval Strategy...")
+            rag_answer = translator_service.generate_rag_answer(user_question)
+            
+            return {
+                "question": user_question,
+                "status": "Success",
+                "type": "RAG",
+                "predicted_sql": None,
+                "row_count": 0,
+                "data": [],
+                "response": rag_answer  # Next.js UI captures this field directly for rendering text markup
+            }
         
-        # 2. Execute the query directly on your home MySQL server via誠SQLAlchemy
-        db_result = db.execute(text(generated_sql))
-        
-        # 3. Convert the database rows into a list of dictionaries
-        records = [dict(row) for row in db_result.mappings()]
-        
-        return {
-            "question": user_question,
-            "status": "Success",
-            "predicted_sql": generated_sql,
-            "row_count": len(records),
-            "data": records 
-        }
+        # 📊 PATH A: Analytical Data / Metrics Intent Detected
+        else:
+            print(f"📊 Analytical Query Intercepted. Initializing Agent Loop Processing Routine...")
+            generated_sql = translator_service.generate_sql(user_question)
+            
+            # Strict programmatic intercept if the translator's security guardrail gets tripped
+            if "CRITICAL_SECURITY_ALERT" in generated_sql:
+                return {
+                    "question": user_question,
+                    "status": "Blocked",
+                    "type": "SQL",
+                    "predicted_sql": generated_sql,
+                    "row_count": 0,
+                    "data": [],
+                    "response": "Security Violation: This destructive request was terminated by system guardrails."
+                }
+            
+            # Execute the verified, read-only SQL query against your SQLAlchemy pool connection
+            db_result = db.execute(text(generated_sql))
+            records = [dict(row) for row in db_result.mappings()]
+            
+            return {
+                "question": user_question,
+                "status": "Success",
+                "type": "SQL",
+                "predicted_sql": generated_sql,
+                "row_count": len(records),
+                "data": records,
+                "response": None
+            }
         
     except Exception as e:
+        print(f"❌ Core API Router Processing Failure: {str(e)}")
         raise HTTPException(
             status_code=500, 
             detail=f"Database Execution Failure: {str(e)}"
@@ -123,7 +178,6 @@ def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
 # 🔌 MCP TRANSPORT LOOPBACK LAYER MOUNTS
 # =====================================================================
 
-# Append the message handling Mount directly to the primary router table
 app.router.routes.append(Mount("/messages", app=sse.handle_post_message))
 
 

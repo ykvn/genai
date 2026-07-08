@@ -2,11 +2,21 @@ import os
 import sys
 import subprocess
 
+# 🩹 CRITICAL STEP 1: Swap out the outdated system SQLite layer immediately!
+# This MUST execute before any tools or third-party packages are imported.
+try:
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
+# 🛠️ Directory and Execution Framework Alignment
 if '__file__' in locals():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 else:
-    # Pointing strictly to your active mcp_server repository folder
-    cml_default_mcp = "/home/cdsw/ask-data/mcp_server"
+    # Synchronized with your data intelligence repository path guidelines
+    cml_default_mcp = "/home/cdsw/data-intelligence/ask-data/mcp_server"
     script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
     
 os.chdir(script_dir)
@@ -40,11 +50,9 @@ mcp = FastMCP("Bank-ABC-Modular-Orchestrator")
 sse = SseServerTransport("/messages")
 
 # --- ACTIVE TOOL REGISTRATION ---
-# Dynamically register your standalone tool function into the FastMCP instance
-from app.tools.sql_query import execute_banking_query
-
-# Dynamically register your schema mapping tool into the FastMCP instance
-from app.tools.sql_query import get_database_schema
+from app.tools.sql_query import execute_banking_query, get_database_schema
+from app.tools.rag_search import perform_rag_search
+from app.tools.dormant_risk import calculate_dormant_account_risk
 
 @mcp.tool(name="get_database_schema")
 def mcp_get_database_schema() -> str:
@@ -62,9 +70,6 @@ def mcp_execute_banking_query(sql_query: str) -> str:
     """
     return execute_banking_query(sql_query)
 
-# Dynamically register your unstructured RAG search engine into the FastMCP instance
-from app.tools.rag_search import perform_rag_search
-
 @mcp.tool(name="search_policy_knowledge_base")
 def mcp_search_policy_knowledge_base(query: str) -> str:
     """
@@ -72,9 +77,6 @@ def mcp_search_policy_knowledge_base(query: str) -> str:
     and SOP documents to return relevant textual contextual snippets for a given query.
     """
     return perform_rag_search(query)
-
-# Dynamically register your specialized risk analytics engine into the FastMCP instance
-from app.tools.dormant_risk import calculate_dormant_account_risk
 
 @mcp.tool(name="evaluate_dormant_account_risk")
 def mcp_evaluate_dormant_account_risk(days_inactive: int, account_balance: float, sudden_withdrawal_amount: float = 0.0) -> str:
@@ -129,10 +131,8 @@ def test_sql_tool(mysql_query: str):
     import json
     raw_result = execute_banking_query(mysql_query)
     try:
-        # Try to parse it into clean JSON if it's database rows
         return {"status": "success", "data": json.loads(raw_result)}
     except:
-        # Return as raw text if it's an error message or string guardrail
         return {"status": "info_or_error", "message": raw_result}
 
 @app.post("/api/test/rag")
@@ -142,13 +142,12 @@ def test_rag_tool(search_query: str):
     return {"status": "success", "matched_context": perform_rag_search(search_query)}
 
 if __name__ == "__main__":
-    # Dynamically match the custom port from your environment logs
     app_port = int(os.getenv("CDSW_APP_PORT", 8100))
     
-    # Configure Uvicorn programmatically while locking down localhost
+    # 🔒 Reverted strictly to localhost per your enterprise security guidelines
     config = uvicorn.Config(
         app, 
-        host="localhost",  # 🔒 Locked strictly to localhost per enterprise guidelines
+        host="localhost",  
         port=app_port, 
         log_level="info"
     )
@@ -156,18 +155,13 @@ if __name__ == "__main__":
     
     try:
         import asyncio
-        # Check if an event loop is already running (Jupyter Notebook environment)
         loop = asyncio.get_running_loop()
-        
-        # Launch the server as a background task inside the notebook's active loop
         loop.create_task(server.serve())
         
         print(f"\n🌐 Production MCP Server launched on http://localhost:{app_port}")
         print(f"📡 Serving protocol streams on http://localhost:{app_port}/sse")
         print("⚡ Notebook Event Loop detected! Server running seamlessly in the background.")
-        print("👉 Your cell is unfrozen. You can now use the server or run tests freely!")
 
     except RuntimeError:
-        # Fallback for standard command-line deployment (when no loop exists yet)
         import asyncio
         asyncio.run(server.serve())
