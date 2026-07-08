@@ -29,7 +29,7 @@ class SQLTranslationService:
         self.api_token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY")
 
         # 📚 Vector DB Configuration Keys (Path A / RAG)
-        self.chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/data-intelligence/ask-data/backend/chroma_db")
+        self.chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")
         self.collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
         
         # 🧠 Initialize local embedding model directly on the 4 vCPU allocation

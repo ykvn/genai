@@ -38,15 +38,14 @@ def trigger_rag_auto_ingest():
     """Phase 3: Database Synchronization. Pre-populates ChromaDB vector maps."""
     print("\n📡 [RAG STARTUP] Synchronizing Knowledge Base document vector nodes...")
     try:
-        # 🎯 LAZY IMPORT: Imported strictly inside this scope *after* pip installer finishes execution
         from app.core.ingest import run_auto_ingest
         
-        # Read absolute environment values defined in your Cloudera interface setup
-        persist_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/data-intelligence/ask-data/backend/chroma_db")
+        # 📂 Cleaned: Removed 'data-intelligence'
+        persist_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")
         collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
         
-        # Guide-aligned absolute path verification layer
-        docs_dir = "/home/cdsw/data-intelligence/ask-data/data/documents"
+        # 📂 Cleaned: Removed 'data-intelligence'
+        docs_dir = "/home/cdsw/ask-data/data/documents"
         if not os.path.exists(docs_dir):
             docs_dir = os.path.abspath(os.path.join(os.getcwd(), "..", "data", "documents"))
 
@@ -62,18 +61,29 @@ def trigger_rag_auto_ingest():
         print(f"⚠️ [RAG STARTUP WARNING] Vector synchronization bypassed: {str(e)}\n")
 
 if __name__ == "__main__":
-    # 🛠️ Directory and Execution Framework Alignment
-    if '__file__' in globals():
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-    else:
-        cml_default_backend = "/home/cdsw/data-intelligence/ask-data/backend"
-        script_dir = cml_default_backend if os.path.exists(cml_default_backend) else os.getcwd()
+    # 🔍 DYNAMIC PATH AUTO-DISCOVERY ENGINE
+    # Locked precisely to your /home/cdsw/ask-data workspace footprint
+    possible_roots = [
+        os.getcwd(),
+        "/home/cdsw/ask-data/backend",
+        os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else None
+    ]
+    
+    script_dir = None
+    for path_candidate in possible_roots:
+        if path_candidate and os.path.exists(os.path.join(path_candidate, "app")):
+            script_dir = path_candidate
+            break
+            
+    if not script_dir:
+        script_dir = os.getcwd()
         
+    print(f"📂 Auto-Discovery target context resolved at: {script_dir}")
     os.chdir(script_dir)
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
 
-    # Step 1: Self-heal the container's environment layout
+    # Step 1: Self-heal application dependencies first
     install_dependencies()
     
     # Step 2: Establish connection channels to the backing MySQL target
@@ -82,19 +92,18 @@ if __name__ == "__main__":
     # Step 3: Run structural token indexing onto the storage volumes
     trigger_rag_auto_ingest()
     
-    # Step 4: Fire up Uvicorn to serve the integrated API routing layer
+    # Step 4: Launch web framework execution context
     try:
         print("🌐 Initializing FastAPI Application Web Server Engine...")
         app_port = int(os.getenv("CDSW_APP_PORT", 8090))
         print(f"📡 Binding routing service to gateway interface port: {app_port}")
         
-        # 🛠️ CML Event Loop Management: Resolves notebook loop overlaps via threading
         try:
             asyncio.get_running_loop()
             print("🔄 Active ipython tracking environment detected. Isolating Uvicorn thread loops...")
             
             server_thread = threading.Thread(
-                target=lambda: uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info"),
+                target=lambda: uvicorn.run("app.main:app", host="localhost", port=app_port, log_level="info"),
                 daemon=True
             )
             server_thread.start()
@@ -104,8 +113,7 @@ if __name__ == "__main__":
                 time.sleep(1)
                 
         except RuntimeError:
-            # Standard deployment interface loop fallback
-            uvicorn.run("app.main:app", host="0.0.0.0", port=app_port, log_level="info")
+            uvicorn.run("app.main:app", host="localhost", port=app_port, log_level="info")
             
     finally:
         print("🛑 Platform termination signal captured. Purging cloudflared network hooks...")

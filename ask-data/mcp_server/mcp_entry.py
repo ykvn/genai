@@ -15,8 +15,8 @@ except ImportError:
 if '__file__' in locals():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 else:
-    # Synchronized with your data intelligence repository path guidelines
-    cml_default_mcp = "/home/cdsw/data-intelligence/ask-data/mcp_server"
+    # Synchronized with your repository path guidelines
+    cml_default_mcp = "/home/cdsw/ask-data/mcp_server"
     script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
     
 os.chdir(script_dir)
