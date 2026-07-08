@@ -171,7 +171,7 @@ SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_statu
     # =========================================================================
     # 📑 PATH B: KNOWLEDGE BASE VECTOR RETRIEVAL (RAG)
     # =========================================================================
-    def retrieve_relevant_documents(self, query: str, top_k: int = 2) -> str:
+    def retrieve_relevant_documents(self, query: str, top_k: int = 5) -> str:
         """Runs semantic vector extraction against local persistent database storage."""
         if self.collection.count() == 0:
             return "No document metadata registered in Knowledge Base storage."
@@ -199,7 +199,7 @@ SELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_statu
             raise RuntimeError("CRITICAL: Qwen Engine endpoint address configurations are missing.")
 
         # Extract context vectors matching the customer query
-        document_context = self.retrieve_relevant_documents(user_question, top_k=2)
+        document_context = self.retrieve_relevant_documents(user_question, top_k=5)
         
         rag_prompt = f"""You are an authoritative enterprise policy compliance assistant. 
 Review the following verified reference documents carefully to construct a precise, helpful response. 

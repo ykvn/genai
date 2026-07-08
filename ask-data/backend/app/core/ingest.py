@@ -56,8 +56,8 @@ def run_auto_ingest(docs_dir: str, persist_dir: str, collection_name: str):
                     raw_document_text += extracted_text + "\n"
 
             # Structural text segmentation block
-            chunk_size = 500
-            overlap = 100
+            chunk_size = 1500
+            overlap = 300
             text_fragments = []
             
             for i in range(0, len(raw_document_text), chunk_size - overlap):
