@@ -8,14 +8,24 @@ import threading
 import asyncio
 
 def install_dependencies():
-    """Phase 1: Package Management. Installs requirements before importing core apps."""
+    """
+    Phase 1: Package Management. Installs all required packages 
+    strictly from the external requirements.txt file.
+    """
     requirements_path = "requirements.txt"
+
     if os.path.exists(requirements_path):
         print("📦 Found requirements.txt. Ensuring all dependencies are installed...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
-        print("✅ Container dependencies up to date.")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
+            print("✅ Dependencies successfully updated via requirements.txt.")
+        except Exception as e:
+            print(f"❌ Critical Error: Failed to execute pip install for requirements.txt: {str(e)}")
+            sys.exit(1)
     else:
-        print("⚠️ Warning: requirements.txt not found in execution context directory.")
+        print("❌ CRITICAL ENVIRONMENT ERROR: requirements.txt not found!")
+        print("Please ensure your workspace deployment directory contains a valid requirements.txt layout.")
+        sys.exit(1)  # Abort startup early to prevent downstream application crashes
 
 def bootstrap_cloudflare_tunnel():
     """Phase 2: Network Infrastructure. Proxies the secure port 3306 database stream."""
@@ -40,11 +50,9 @@ def trigger_rag_auto_ingest():
     try:
         from app.core.ingest import run_auto_ingest
         
-        # 📂 Cleaned: Removed 'data-intelligence'
         persist_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")
         collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
         
-        # 📂 Cleaned: Removed 'data-intelligence'
         docs_dir = "/home/cdsw/ask-data/data/documents"
         if not os.path.exists(docs_dir):
             docs_dir = os.path.abspath(os.path.join(os.getcwd(), "..", "data", "documents"))
@@ -62,7 +70,6 @@ def trigger_rag_auto_ingest():
 
 if __name__ == "__main__":
     # 🔍 DYNAMIC PATH AUTO-DISCOVERY ENGINE
-    # Locked precisely to your /home/cdsw/ask-data workspace footprint
     possible_roots = [
         os.getcwd(),
         "/home/cdsw/ask-data/backend",
@@ -83,7 +90,7 @@ if __name__ == "__main__":
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
 
-    # Step 1: Self-heal application dependencies first
+    # Step 1: Run deterministic dependency validation loop
     install_dependencies()
     
     # Step 2: Establish connection channels to the backing MySQL target
