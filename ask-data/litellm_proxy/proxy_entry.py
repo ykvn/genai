@@ -9,7 +9,6 @@ def ensure_proxy_dependencies():
     """
     print("📦 Validating LiteLLM application dependencies...")
     try:
-        # Installs the proxy core along with standard networking features
         subprocess.check_call([sys.executable, "-m", "pip", "install", "litellm[proxy]"])
         print("✅ LiteLLM gateway utilities verified successfully.")
     except Exception as e:
@@ -17,9 +16,30 @@ def ensure_proxy_dependencies():
         sys.exit(1)
 
 if __name__ == "__main__":
-    # Ensure correct runtime workspace directory context
-    script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-    os.chdir(script_dir)
+    # 🔍 DYNAMIC CONFIGURATION PATH DISCOVERY ENGINE
+    # Resolves path issues when running inside interactive CML notebook cells
+    base_cwd = os.getcwd()
+    candidate_paths = [
+        os.path.join(base_cwd, "litellm_config.yaml"),
+        os.path.join(base_cwd, "litellm_proxy", "litellm_config.yaml"),
+        "/home/cdsw/ask-data/litellm_proxy/litellm_config.yaml"
+    ]
+
+    config_path = None
+    for path in candidate_paths:
+        if os.path.exists(path):
+            config_path = os.path.abspath(path)
+            break
+
+    if not config_path:
+        print("❌ CRITICAL SETUP ERROR: Could not locate 'litellm_config.yaml' on disk.")
+        print(f"Searched target locations: {candidate_paths}")
+        print("Please verify that the configuration file exists in your workspace directory.")
+        sys.exit(1)
+
+    # Automatically synchronize working directory to where the config actually lives
+    os.chdir(os.path.dirname(config_path))
+    print(f"📍 Successfully located configuration file at: {config_path}")
     
     # 🔒 ENTERPRISE BOUNDARY GUARD: Assert variable configuration before thread generation
     if "QWEN_APP_URL" not in os.environ:
@@ -40,7 +60,7 @@ if __name__ == "__main__":
     # Standardized operational startup parameters
     proxy_command = [
         "litellm",
-        "--config", "litellm_config.yaml",
+        "--config", config_path,               # 🎯 Pass the absolute, verified path string
         "--port", str(app_port),
         "--host", "localhost"                   # Locked strictly to localized loopback core interface
     ]
