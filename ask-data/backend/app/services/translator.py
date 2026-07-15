@@ -51,59 +51,58 @@ class SQLTranslationService:
         self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name)
 
     # =========================================================================
-    # 📑 PATH A: UPGRADED CREWAI TEXT-TO-SQL AGENT ENGINE
+    # 📑 PATH A: OPTIMIZED TEXT-TO-SQL ENGINE (DIRECT CONTEXT INJECTION)
     # =========================================================================
     def generate_sql(self, user_question: str) -> str:
-        """Autonomous execution loop replacing the legacy manual turn code structures."""
+        """Deterministic execution pipeline that forces schema adherence for compact models."""
         
-        # Define a standalone tool context that CrewAI can execute dynamically
-        @tool("Fetch Database Schema Layout")
-        def fetch_schema_tool() -> str:
-            """Useful when you need to inspect table names, available columns, primary keys, 
-            and data relationships from the MySQL cluster layout before drafting a query."""
-            target_mcp_endpoint = f"{os.getenv('MCP_SERVER_URL')}/api/test/schema"
-            token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or ""
-            try:
-                req = urllib.request.Request(
-                    target_mcp_endpoint,
-                    headers={"Authorization": f"Bearer {token}"},
-                    method="GET"
-                )
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    schema_data = json.loads(response.read().decode("utf-8"))
-                    return schema_data.get("raw_yaml_configuration", "")
-            except Exception as e:
-                return f"Failed to reach target schema configuration gateway: {str(e)}"
+        # 1. Force Python to fetch the schema directly from the MCP Server upfront
+        print("📡 Fetching database schema layout from MCP cluster network...")
+        target_mcp_endpoint = f"{self.mcp_server_url}/api/test/schema"
+        try:
+            req = urllib.request.Request(
+                target_mcp_endpoint,
+                headers={"Authorization": f"Bearer {self.api_token}"},
+                method="GET"
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                schema_data = json.loads(response.read().decode("utf-8"))
+                db_schema_layout = schema_data.get("raw_yaml_configuration", "")
+        except Exception as e:
+            print(f"⚠️ Schema fetch fallback triggered: {str(e)}")
+            db_schema_layout = "Error: Unable to load structural layout matrix."
 
-        # 1. Define the structural engineering persona
+        # 2. Define the structural engineering persona (Cleaned of tool overhead)
         sql_developer = Agent(
             role="Senior MySQL 8.0 Database Translation Architect",
             goal="Convert conversational user requests into valid, optimized read-only SQL statements.",
             backstory=(
-                "You are an expert analytics engineer at Bank Jatim. You strictly examine structural "
-                "table schema definitions using your tool options before declaring a final statement code asset."
+                "You are an expert analytics engineer at Bank Jatim. You strictly write queries "
+                "using only the exact table structures, explicit columns, and data relationships provided to you."
             ),
-            tools=[fetch_schema_tool],
             llm=self.llm,
             verbose=True
         )
 
-        # 2. Declare the rigorous task boundaries to match your enterprise safety mandates
+        # 3. Inject the schema layout directly into the Task description text
         draft_sql_task = Task(
             description=(
-                f"Process the following user query: '{user_question}'.\n"
+                f"Process the following user query: '{user_question}'.\n\n"
+                f"📊 VERIFIED LIVE DATABASE SCHEMA LAYOUT:\n"
+                f"{db_schema_layout}\n\n"
                 "OPERATIONAL BOUNDARIES:\n"
-                "1. You MUST request the system table schemas first using your available tools.\n"
-                "2. Once schema details are parsed, output your query wrapped inside a clean markdown ```sql ``` block.\n"
-                "3. CRITICAL SECURITY GUARDRAIL: If you detect mutation attempts (INSERT, UPDATE, DELETE, DROP), "
+                "1. CRITICAL: You MUST strictly use the actual table and column names listed in the LIVE DATABASE SCHEMA LAYOUT above.\n"
+                "2. DO NOT guess, assume, or invent generic tables (such as 'customer' or 'users') if they are not explicitly declared in the schema layout above.\n"
+                "3. Output your query wrapped inside a clean markdown ```sql ``` block.\n"
+                "4. CRITICAL SECURITY GUARDRAIL: If you detect mutation attempts (INSERT, UPDATE, DELETE, DROP), "
                 "abort operations immediately and return exactly this block:\n"
                 "```sql\nSELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_status;\n```"
             ),
-            expected_output="A clean MySQL SELECT statement inside a standard markdown code block wrapper.",
+            expected_output="A clean MySQL SELECT statement inside a standard markdown code block wrapper based strictly on the provided layout text.",
             agent=sql_developer
         )
 
-        # 3. Assemble and launch the automated agent team context
+        # 4. Assemble and launch the automated agent team context
         orchestration_crew = Crew(
             agents=[sql_developer],
             tasks=[draft_sql_task],
