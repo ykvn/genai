@@ -21,35 +21,34 @@ from crewai.tools import tool
 class SQLTranslationService:
     def __init__(self):
         # 🌐 Microservice network endpoints preserved from your architectural rules
-        self.mcp_server_url = os.getenv("MCP_SERVER_URL")[cite: 1]
+        self.mcp_server_url = os.getenv("MCP_SERVER_URL")
         
         # 🔌 LiteLLM Connection Point: Extract the CML App Subdomain path assigned to LiteLLM
-        # CrewAI manages the completions endpoint strings internally; pass the base URL directory path
-        self.qwen_base_url = os.getenv("QWEN_BASE_URL", "http://localhost:8100/v1").rstrip("/")[cite: 1]
+        self.qwen_base_url = os.getenv("QWEN_BASE_URL", "http://localhost:8100/v1").rstrip("/")
         
         # 🔑 Security Access Handshake Tokens
-        self.api_token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or "litellm-dummy-token"[cite: 1]
+        self.api_token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or "litellm-dummy-token"
 
         # 🧠 Initialize the CrewAI Native LLM Interface pointing directly to your LiteLLM Proxy
         print(f"📡 Connecting CrewAI to Standalone LiteLLM Proxy Gateway at: {self.qwen_base_url}")
         self.llm = LLM(
-            model=f"openai/{os.getenv('QWEN_MODEL', 'qwen2.5-3b-instruct')}",[cite: 1]
+            model=f"openai/{os.getenv('QWEN_MODEL', 'qwen2.5-3b-instruct')}",
             base_url=self.qwen_base_url,
             api_key=self.api_token,
             temperature=0.0
         )
 
         # 📚 Vector DB Configuration Keys (Path B / RAG)
-        self.chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")[cite: 1]
-        self.collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")[cite: 1]
+        self.chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")
+        self.collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
         
         # 🧠 Initialize local embedding model directly on the vCPU allocation
         print("🧠 Loading local MiniLM-L6 vector embedding weights...")
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")[cite: 1]
+        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
         
         # Connect to the persistent Chroma storage directory
-        self.chroma_client = chromadb.PersistentClient(path=self.chroma_dir)[cite: 1]
-        self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name)[cite: 1]
+        self.chroma_client = chromadb.PersistentClient(path=self.chroma_dir)
+        self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name)
 
     # =========================================================================
     # 📑 PATH A: UPGRADED CREWAI TEXT-TO-SQL AGENT ENGINE
@@ -62,17 +61,17 @@ class SQLTranslationService:
         def fetch_schema_tool() -> str:
             """Useful when you need to inspect table names, available columns, primary keys, 
             and data relationships from the MySQL cluster layout before drafting a query."""
-            target_mcp_endpoint = f"{os.getenv('MCP_SERVER_URL')}/api/test/schema"[cite: 1]
-            token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or ""[cite: 1]
+            target_mcp_endpoint = f"{os.getenv('MCP_SERVER_URL')}/api/test/schema"
+            token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or ""
             try:
                 req = urllib.request.Request(
                     target_mcp_endpoint,
-                    headers={"Authorization": f"Bearer {token}"},[cite: 1]
+                    headers={"Authorization": f"Bearer {token}"},
                     method="GET"
                 )
-                with urllib.request.urlopen(req, timeout=10) as response:[cite: 1]
-                    schema_data = json.loads(response.read().decode("utf-8"))[cite: 1]
-                    return schema_data.get("raw_yaml_configuration", "")[cite: 1]
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    schema_data = json.loads(response.read().decode("utf-8"))
+                    return schema_data.get("raw_yaml_configuration", "")
             except Exception as e:
                 return f"Failed to reach target schema configuration gateway: {str(e)}"
 
@@ -115,39 +114,39 @@ class SQLTranslationService:
         ai_result = str(orchestration_crew.kickoff()).strip()
 
         # Extract the pure query string from the markdown blocks for downstream execution compatibility
-        if "```sql" in ai_result:[cite: 1]
-            return ai_result.split("```sql")[1].split("```")[0].strip()[cite: 1]
-        elif "SELECT" in ai_result.upper():[cite: 1]
-            return ai_result.replace("```", "").strip()[cite: 1]
+        if "```sql" in ai_result:
+            return ai_result.split("```sql")[1].split("```")[0].strip()
+        elif "SELECT" in ai_result.upper():
+            return ai_result.replace("```", "").strip()
         
-        return ai_result[cite: 1]
+        return ai_result
 
     # =========================================================================
     # 📑 PATH B: KNOWLEDGE BASE VECTOR RETRIEVAL (RAG)
     # =========================================================================
     def retrieve_relevant_documents(self, query: str, top_k: int = 5) -> str:
         """Runs semantic vector extraction against local persistent database storage."""
-        if self.collection.count() == 0:[cite: 1]
-            return "No document metadata registered in Knowledge Base storage."[cite: 1]
+        if self.collection.count() == 0:
+            return "No document metadata registered in Knowledge Base storage."
 
-        query_vector = self.embedding_model.encode(query).tolist()[cite: 1]
+        query_vector = self.embedding_model.encode(query).tolist()
         
-        results = self.collection.query([cite: 1]
-            query_embeddings=[query_vector],[cite: 1]
-            n_results=top_k[cite: 1]
+        results = self.collection.query(
+            query_embeddings=[query_vector],
+            n_results=top_k
         )
         
         retrieved_contexts = []
-        if results and 'documents' in results and results['documents']:[cite: 1]
-            for idx, text in enumerate(results['documents'][0]):[cite: 1]
-                source = results['metadatas'][0][idx]['source_file'][cite: 1]
-                retrieved_contexts.append(f"[Source Manual: {source}]\n{text}")[cite: 1]
+        if results and 'documents' in results and results['documents']:
+            for idx, text in enumerate(results['documents'][0]):
+                source = results['metadatas'][0][idx]['source_file']
+                retrieved_contexts.append(f"[Source Manual: {source}]\n{text}")
                 
-        return "\n\n---\n\n".join(retrieved_contexts)[cite: 1]
+        return "\n\n---\n\n".join(retrieved_contexts)
 
     def generate_rag_answer(self, user_question: str) -> str:
         """Coordinates unstructured context parsing with Qwen via LiteLLM to answer policies."""
-        document_context = self.retrieve_relevant_documents(user_question, top_k=5)[cite: 1]
+        document_context = self.retrieve_relevant_documents(user_question, top_k=5)
         
         compliance_officer = Agent(
             role="Authoritative Corporate Policy Compliance Specialist",
