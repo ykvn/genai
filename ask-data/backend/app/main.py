@@ -1,8 +1,17 @@
 import os
+import sys
 import json
 from fastapi import FastAPI, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+# 🩹 ENTERPRISE RUNTIME PATCH: Force modern SQLite layers immediately!
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except ImportError:
+    pass
+
 from app.database import get_db, SessionLocal
 from app.schemas.query import QueryRequest
 from app.services.translator import SQLTranslationService
@@ -26,7 +35,6 @@ def is_policy_question(question: str) -> bool:
     is a document/policy request (RAG) or an analytical database request (SQL).
     """
     q_lower = question.lower()
-    # Comprehensive routing keywords matching your deployment manual guidelines
     rag_keywords = [
         "kebijakan", "sop", "prosedur", "manual", "panduan", "kriteria", 
         "aturan", "regulasi", "dokumen", "syarat", "sk", "surat keputusan"
@@ -92,20 +100,22 @@ def search_policy_documents(query: str) -> str:
 
 
 # =====================================================================
-# 🌐 PRESERVED ORIGINAL HTTP ENDPOINTS (Kept intact for backwards compatibility)
+# 🌐 UNIFIED HEALTH CHECKS & HTTP ENDPOINTS (Bypasses 404 platform log loops)
 # =====================================================================
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to the Bank ABC NL-to-SQL Core API", "status": "online"}
-
-
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):
+    """Satisfies platform container health checks to prevent routing disruptions."""
     try:
         result = db.execute(text("SELECT 1;")).scalar()
         if result == 1:
-            return {"status": "healthy", "database_connection": "connected", "tunnel": "active"}
+            return {
+                "status": "healthy", 
+                "message": "Welcome to the Bank ABC NL-to-SQL Core API",
+                "database_connection": "connected", 
+                "tunnel": "active"
+            }
     except Exception as e:
         return {"status": "unhealthy", "database_error": str(e)}
 
@@ -114,8 +124,7 @@ def health_check(db: Session = Depends(get_db)):
 def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
     """
     Processes natural language questions, automatically splits routing lines 
-    between document policies (RAG) and relational transactions (SQL), 
-    and handles output payload assembly.
+    between document policies (RAG) and relational transactions (SQL).
     """
     try:
         user_question = payload.question
@@ -132,7 +141,7 @@ def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
                 "predicted_sql": None,
                 "row_count": 0,
                 "data": [],
-                "response": rag_answer  # Next.js UI captures this field directly for rendering text markup
+                "response": rag_answer
             }
         
         # 📊 PATH A: Analytical Data / Metrics Intent Detected
@@ -140,7 +149,7 @@ def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
             print(f"📊 Analytical Query Intercepted. Initializing Agent Loop Processing Routine...")
             generated_sql = translator_service.generate_sql(user_question)
             
-            # Strict programmatic intercept if the translator's security guardrail gets tripped
+            # Programmatic intercept if the security guardrail gets tripped
             if "CRITICAL_SECURITY_ALERT" in generated_sql:
                 return {
                     "question": user_question,
@@ -152,7 +161,6 @@ def ask_ai(payload: QueryRequest, db: Session = Depends(get_db)):
                     "response": "Security Violation: This destructive request was terminated by system guardrails."
                 }
             
-            # Execute the verified, read-only SQL query against your SQLAlchemy pool connection
             db_result = db.execute(text(generated_sql))
             records = [dict(row) for row in db_result.mappings()]
             

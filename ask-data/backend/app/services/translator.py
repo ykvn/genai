@@ -1,12 +1,11 @@
 import os
+import sys
 import json
 import urllib.request
-import time
 
 # 🩹 ENTERPRISE LINUX RUNTIME PATCH: Force modern SQLite layers before importing ChromaDB
 try:
     __import__('pysqlite3')
-    import sys
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 except ImportError:
     pass
@@ -16,15 +15,14 @@ from sentence_transformers import SentenceTransformer
 
 # 🤖 CrewAI Framework Engine Integration Modules
 from crewai import Agent, Task, Crew, Process, LLM
-from crewai.tools import tool
 
 class SQLTranslationService:
     def __init__(self):
-        # 🌐 Microservice network endpoints preserved from your architectural rules
+        # 🌐 Microservice network endpoints preserved from architectural rules
         self.mcp_server_url = os.getenv("MCP_SERVER_URL")
         
-        # 🔌 LiteLLM Connection Point: Extract the CML App Subdomain path assigned to LiteLLM
-        self.qwen_base_url = os.getenv("QWEN_BASE_URL", "http://localhost:8100/v1").rstrip("/")
+        # 🔌 LiteLLM Connection Point: Point strictly to loopback interface mapping targets
+        self.qwen_base_url = os.getenv("QWEN_BASE_URL").rstrip("/")
         
         # 🔑 Security Access Handshake Tokens
         self.api_token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or "litellm-dummy-token"
