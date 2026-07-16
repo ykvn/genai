@@ -3,18 +3,27 @@ import sys
 import subprocess
 from pathlib import Path
 
-def ensure_proxy_dependencies(env: dict) -> None:
+
+def ensure_dependencies(proxy_dir: Path, env: dict) -> None:
     """
-    Validates and installs the mandatory routing proxy framework package 
-    directly into the CML application container runtime environment.
+    Validates and installs packages from requirements.txt directly 
+    into the CML application container runtime environment.
     """
-    print("📦 Validating LiteLLM application dependencies...")
+    req_file = proxy_dir / "requirements.txt"
+    if not req_file.exists():
+        print(f"⚠️ No requirements.txt found at {req_file}. Skipping dependency installation.")
+        return
+        
+    print(f"📦 Validating dependencies from {req_file}...")
     try:
-        # Pass the patched env so pip executes correctly in the context
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "litellm[proxy]", "-q"], env=env)
-        print("✅ LiteLLM gateway utilities verified successfully.")
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+            check=True,
+            env=env,
+        )
+        print("✅ Dependencies verified successfully.")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Critical Error: Failed to configure LiteLLM dependencies: {str(e)}")
+        print(f"❌ Critical Error: Failed to configure dependencies: {str(e)}")
         sys.exit(1)
 
 
@@ -64,8 +73,8 @@ def main() -> None:
     pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = f"{proxy_dir}:{pythonpath}" if pythonpath else str(proxy_dir)
 
-    # 5. Run auto-healing dependency validation routine
-    ensure_proxy_dependencies(env)
+    # 5. Run standard dependency validation routine
+    ensure_dependencies(proxy_dir, env)
     
     # 6. Standardized command execution pattern
     cmd = [
