@@ -1,12 +1,12 @@
 import os
 import sys
-import subprocess
 from pathlib import Path
 from typing import List
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 import torch
+import uvicorn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # ⚡ CPU INFERENCE OPTIMIZATION LAYER
@@ -35,9 +35,8 @@ if not model_path:
 print(f"📍 Target model weights located at: {model_path}")
 
 # =========================================================================
-# 🧠 DEFERRED MODEL LOADING (Prevents double-execution in subprocess)
+# 🧠 DEFERRED MODEL LOADING 
 # =========================================================================
-# Set global placeholders so the route can access them later
 global_model = None
 global_tokenizer = None
 
@@ -45,7 +44,6 @@ global_tokenizer = None
 async def lifespan(app: FastAPI):
     global global_model, global_tokenizer
     
-    # This block ONLY runs inside the Uvicorn worker process, saving your RAM!
     print("⏳ [Lifespan Event] Loading Qwen weights into system RAM...")
     global_tokenizer = AutoTokenizer.from_pretrained(model_path)
     global_model = AutoModelForCausalLM.from_pretrained(
@@ -56,9 +54,8 @@ async def lifespan(app: FastAPI):
     )
     print("✅ [Lifespan Event] Model successfully loaded and ready for inference.")
     
-    yield  # The server handles requests while yielding here
+    yield  
     
-    # Cleanup when Uvicorn shuts down
     print("🧹 [Lifespan Event] Shutting down and clearing RAM...")
     global_model = None
     global_tokenizer = None
@@ -114,36 +111,13 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
     }
 
 # =========================================================================
-# ⚙️ SUBPROCESS EXECUTION ENGINE
+# ⚙️ DIRECT EXECUTION ENGINE 
 # =========================================================================
 if __name__ == "__main__":
     # strictly enforces the dynamically allocated port by the CML environment
     app_port = int(os.environ["CDSW_APP_PORT"])
     
-    env = os.environ.copy()
-    existing_pythonpath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{script_dir}:{existing_pythonpath}" if existing_pythonpath else str(script_dir)
+    print(f"🌐 Starting Aligned CPU Inference Server directly on http://127.0.0.1:{app_port}")
     
-    cmd = [
-        sys.executable,
-        "-m",
-        "uvicorn",
-        "qwen_cpu_entry:app",       
-        "--host",
-        "127.0.0.1",
-        "--port",
-        str(app_port),
-        "--log-level",
-        "info"
-    ]
-    
-    print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
-    
-    # Launch Uvicorn using the patched 'env' we created above
-    process = subprocess.Popen(cmd, cwd=script_dir, env=env)
-    
-    try:
-        process.wait()
-    except KeyboardInterrupt:
-        print("\n🛑 Shutting down Inference Server...")
-        process.terminate()
+    # 🎯 Launch Uvicorn directly in the main thread (No subprocess self-import issues)
+    uvicorn.run(app, host="127.0.0.1", port=app_port, log_level="info")
