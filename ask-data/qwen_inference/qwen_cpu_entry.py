@@ -3,20 +3,39 @@ import sys
 import subprocess
 from pathlib import Path
 
-def main() -> None:
-    # Set up paths
-    script_dir = Path(__file__).parent.resolve() if '__file__' in globals() else Path.cwd()
-    os.chdir(script_dir)
+def resolve_qwen_dir() -> Path:
+    """Robustly finds the qwen_inference directory regardless of where CML launches the script."""
+    cwd = Path.cwd()
     
-    # strictly enforces the dynamically allocated port by the CML environment
+    # Generate a list of probable locations for the app folder
+    candidates = [
+        Path(__file__).parent.resolve() if '__file__' in globals() else cwd,
+        cwd / "qwen_inference",
+        cwd / "ask-data" / "qwen_inference",
+    ]
+    
+    # Return the first path that actually contains app/main.py
+    for c in candidates:
+        if (c / "app" / "main.py").exists():
+            return c
+            
+    print(f"❌ Critical Error: Could not locate 'app/main.py'. Are you sure the 'app' folder exists?")
+    return cwd
+
+def main() -> None:
+    # 1. Use the robust resolver to lock in the correct directory
+    qwen_dir = resolve_qwen_dir()
+    os.chdir(qwen_dir)
+    
+    # 2. Enforce the dynamically allocated port
     app_port = int(os.environ.get("CDSW_APP_PORT"))
     
-    # Inject PYTHONPATH just like the mcp_entry.py and backend_entry.py scripts
+    # 3. Inject PYTHONPATH
     env = os.environ.copy()
     pythonpath = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{script_dir}:{pythonpath}" if pythonpath else str(script_dir)
+    env["PYTHONPATH"] = f"{qwen_dir}:{pythonpath}" if pythonpath else str(qwen_dir)
     
-    # 🎯 Standardized Uvicorn call pointing directly to app/main.py
+    # 4. Standardized Uvicorn call pointing directly to app/main.py
     cmd = [
         sys.executable,
         "-m",
@@ -31,9 +50,10 @@ def main() -> None:
     ]
     
     print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
+    print(f"📍 Resolved Working Directory: {qwen_dir}")
     
-    # Launch Uvicorn
-    process = subprocess.Popen(cmd, cwd=str(script_dir), env=env)
+    # Launch Uvicorn safely in its own process
+    process = subprocess.Popen(cmd, cwd=str(qwen_dir), env=env)
     
     try:
         process.wait()
