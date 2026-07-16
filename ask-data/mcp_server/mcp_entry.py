@@ -1,167 +1,89 @@
 import os
 import sys
 import subprocess
+from pathlib import Path
 
-# 🩹 CRITICAL STEP 1: Swap out the outdated system SQLite layer immediately!
-# This MUST execute before any tools or third-party packages are imported.
-try:
-    __import__('pysqlite3')
-    import sys
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except ImportError:
-    pass
-
-# 🛠️ Directory and Execution Framework Alignment
-if '__file__' in locals():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-else:
-    # Synchronized with your repository path guidelines
-    cml_default_mcp = "/home/cdsw/ask-data/mcp_server"
-    script_dir = cml_default_mcp if os.path.exists(cml_default_mcp) else os.getcwd()
-    
-os.chdir(script_dir)
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-
-def install_dependencies():
-    """Automatically installs packages from requirements.txt on startup"""
-    requirements_path = "requirements.txt"
-    if os.path.exists(requirements_path):
-        print("📦 Found requirements.txt. Ensuring all server dependencies are installed...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
-        print("✅ Dependencies up to date.")
-    else:
-        print("⚠️ Warning: requirements.txt not found in current directory.")
-
-# Self-heal your environment dependencies first
-install_dependencies()
-
-# Core framework components
-import uvicorn
-from fastapi import FastAPI, Request
-from starlette.routing import Mount
-from fastmcp import FastMCP
-from mcp.server.sse import SseServerTransport
-
-# 1. Initialize the central FastMCP application state
-mcp = FastMCP("Bank-ABC-Modular-Orchestrator")
-
-# 2. Configure the standardized SSE message pipeline transport
-sse = SseServerTransport("/messages")
-
-# --- ACTIVE TOOL REGISTRATION ---
-from app.tools.sql_query import execute_banking_query, get_database_schema
-from app.tools.rag_search import perform_rag_search
-from app.tools.dormant_risk import calculate_dormant_account_risk
-
-@mcp.tool(name="get_database_schema")
-def mcp_get_database_schema() -> str:
+def ensure_dependencies(mcp_dir: Path, env: dict) -> None:
     """
-    Retrieves the structural enterprise schema configuration, table layouts, 
-    available columns, column types, primary/foreign keys, and data relationships.
+    Validates and installs packages from requirements.txt directly 
+    into the CML application container runtime environment.
     """
-    return get_database_schema()
-
-@mcp.tool(name="execute_banking_query")
-def mcp_execute_banking_query(sql_query: str) -> str:
-    """
-    Executes a read-only MySQL SELECT statement against the live bank analytics database 
-    through the secure tunnel and returns rows as a formatted JSON string.
-    """
-    return execute_banking_query(sql_query)
-
-@mcp.tool(name="search_policy_knowledge_base")
-def mcp_search_policy_knowledge_base(query: str) -> str:
-    """
-    Scans through internal unstructured enterprise banking policies, compliance guidelines, 
-    and SOP documents to return relevant textual contextual snippets for a given query.
-    """
-    return perform_rag_search(query)
-
-@mcp.tool(name="evaluate_dormant_account_risk")
-def mcp_evaluate_dormant_account_risk(days_inactive: int, account_balance: float, sudden_withdrawal_amount: float = 0.0) -> str:
-    """
-    Calculates a risk priority score, classification tier, and security intervention flags 
-    for an inactive bank account using internal compliance risk matrix rules.
-    """
-    return calculate_dormant_account_risk(days_inactive, account_balance, sudden_withdrawal_amount)
-
-
-# 3. Create the FastAPI container to manage incoming enterprise cluster traffic
-app = FastAPI(title="Bank ABC Production MCP Gateway")
-
-# Route incoming protocol control packets cleanly into the SSE transport layer
-app.router.routes.append(Mount("/messages", app=sse.handle_post_message))
-
-
-@app.get("/health")
-def platform_health_check():
-    """Basic endpoint used by Cloudera AI to verify the container layer is active"""
-    return {
-        "status": "healthy", 
-        "protocol": "Model Context Protocol v1", 
-        "transport": "Server-Sent Events (SSE)"
-    }
-
-
-@app.get("/sse")
-async def handle_sse_handshake(request: Request):
-    """Establishes the long-lived protocol connection stream for incoming AI clients"""
-    async with sse.connect_sse(
-        request.scope, request.receive, request._send
-    ) as streams:
-        await mcp._mcp_server.run(
-            streams[0], streams[1], mcp._mcp_server.create_initialization_options()
-        )
-
-# =====================================================================
-# 🧪 SWAGGER DOCS INTERACTIVE TESTING ENDPOINTS
-# =====================================================================
-
-@app.get("/api/test/schema")
-def test_schema_tool():
-    """Interactive playground to test your get_database_schema tool"""
-    from app.tools.sql_query import get_database_schema
-    return {"raw_yaml_configuration": get_database_schema()}
-
-@app.post("/api/test/sql")
-def test_sql_tool(mysql_query: str):
-    """Interactive playground to test your execute_banking_query tool"""
-    from app.tools.sql_query import execute_banking_query
-    import json
-    raw_result = execute_banking_query(mysql_query)
+    req_file = mcp_dir / "requirements.txt"
+    if not req_file.exists():
+        print(f"⚠️ No requirements.txt found at {req_file}. Skipping dependency installation.")
+        return
+        
+    print(f"📦 Validating dependencies from {req_file}...")
     try:
-        return {"status": "success", "data": json.loads(raw_result)}
-    except:
-        return {"status": "info_or_error", "message": raw_result}
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q"],
+            check=True,
+            env=env,
+        )
+        print("✅ Dependencies verified successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Critical Error: Failed to configure dependencies: {str(e)}")
+        sys.exit(1)
 
-@app.post("/api/test/rag")
-def test_rag_tool(search_query: str):
-    """Interactive playground to test your search_policy_knowledge_base tool"""
-    from app.tools.rag_search import perform_rag_search
-    return {"status": "success", "matched_context": perform_rag_search(search_query)}
+def resolve_mcp_dir() -> Path:
+    """Robustly finds the mcp_server directory regardless of where CML launches the script."""
+    cwd = Path.cwd()
+    
+    candidates = [
+        Path(__file__).parent.resolve() if '__file__' in globals() else cwd,
+        cwd / "mcp_server",
+        cwd / "ask-data" / "mcp_server",
+        Path("/home/cdsw/ask-data/mcp_server")
+    ]
+    
+    for c in candidates:
+        if (c / "app" / "main.py").exists():
+            return c
+            
+    print(f"❌ Critical Error: Could not locate 'app/main.py'. Are you sure the folder structure is correct?")
+    return cwd
+
+def main() -> None:
+    # 1. Lock in the correct directory execution context
+    mcp_dir = resolve_mcp_dir()
+    os.chdir(mcp_dir)
+    
+    # 2. Extract the dynamically allocated port by the CML environment
+    app_port = int(os.environ.get("CDSW_APP_PORT", 8100))
+    
+    # 3. Patch environment variables with absolute PYTHONPATH injections
+    env = os.environ.copy()
+    pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{mcp_dir}:{pythonpath}" if pythonpath else str(mcp_dir)
+    
+    # 4. Handle dependency resolution before thread initialization
+    ensure_dependencies(mcp_dir, env)
+    
+    # 5. Standardized operational startup parameter array targeting app.main:app
+    cmd = [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "app.main:app",       
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(app_port),
+        "--log-level",
+        "info"
+    ]
+    
+    print(f"🌐 Starting Aligned Production MCP Server via subprocess on http://127.0.0.1:{app_port}")
+    print(f"📍 Resolved Execution Root Context: {mcp_dir}")
+    
+    # Launch Uvicorn cleanly inside its own isolated operating system process
+    process = subprocess.Popen(cmd, cwd=str(mcp_dir), env=env)
+    
+    try:
+        process.wait()
+    except KeyboardInterrupt:
+        print("\n🛑 Gateway loop execution interrupted. Purging active proxy sockets...")
+        process.terminate()
 
 if __name__ == "__main__":
-    app_port = int(os.getenv("CDSW_APP_PORT", 8100))
-    
-    # 🔒 Reverted strictly to localhost per your enterprise security guidelines
-    config = uvicorn.Config(
-        app, 
-        host="localhost",  
-        port=app_port, 
-        log_level="info"
-    )
-    server = uvicorn.Server(config)
-    
-    try:
-        import asyncio
-        loop = asyncio.get_running_loop()
-        loop.create_task(server.serve())
-        
-        print(f"\n🌐 Production MCP Server launched on http://localhost:{app_port}")
-        print(f"📡 Serving protocol streams on http://localhost:{app_port}/sse")
-        print("⚡ Notebook Event Loop detected! Server running seamlessly in the background.")
-
-    except RuntimeError:
-        import asyncio
-        asyncio.run(server.serve())
+    main()
