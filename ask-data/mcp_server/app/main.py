@@ -95,10 +95,10 @@ def test_schema_tool():
     return {"raw_yaml_configuration": get_database_schema()}
 
 @app.post("/api/test/sql")
-def test_sql_tool(mysql_query: str):
+def test_sql_tool(sql_query: str):
     """Interactive playground to test your execute_banking_query tool"""
     import json
-    raw_result = execute_banking_query(mysql_query)
+    raw_result = execute_banking_query(sql_query)
     try:
         return {"status": "success", "data": json.loads(raw_result)}
     except Exception:
