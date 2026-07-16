@@ -1,8 +1,6 @@
 import os
 import sys
 import subprocess
-import time
-import urllib.request
 from pathlib import Path
 
 def ensure_dependencies(backend_dir: Path, env: dict) -> None:
@@ -26,23 +24,6 @@ def ensure_dependencies(backend_dir: Path, env: dict) -> None:
     except subprocess.CalledProcessError as e:
         print(f"❌ Critical Error: Failed to configure dependencies: {str(e)}")
         sys.exit(1)
-
-def bootstrap_cloudflare_tunnel() -> subprocess.Popen:
-    """Network Infrastructure. Proxies the secure port 3306 database stream."""
-    binary_path = "./cloudflared"
-    if not os.path.exists(binary_path):
-        print("📥 Cloudflared binary missing. Downloading Linux x64 runtime package...")
-        url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
-        urllib.request.urlretrieve(url, binary_path)
-        os.chmod(binary_path, 0o755)
-        print("✅ Cloudflared proxy binary compiled.")
-
-    print("⏳ Activating secure Cloudflare Zero Trust network bridge...")
-    tunnel_command = ["./cloudflared", "access", "tcp", "--hostname", "mysql.ksmd.my.id", "--url", "127.0.0.1:3306"]
-    process = subprocess.Popen(tunnel_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    time.sleep(3)
-    print("🚀 Secure tunnel verified. Relational database exposed locally at 127.0.0.1:3306")
-    return process
 
 def trigger_rag_auto_ingest(backend_dir: Path) -> None:
     """Database Synchronization. Pre-populates ChromaDB vector maps."""
@@ -94,16 +75,15 @@ def main() -> None:
     os.chdir(backend_dir)
     
     # 2. Extract port specifications allocated dynamically by the environment
-    app_port = int(os.environ.get("CDSW_APP_PORT"))
+    app_port = int(os.environ.get("CDSW_APP_PORT", 8090))
     
     # 3. Patch environment variables with absolute PYTHONPATH variables
     env = os.environ.copy()
     pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = f"{backend_dir}:{pythonpath}" if pythonpath else str(backend_dir)
     
-    # 4. Process initialization sequence frameworks
+    # 4. Process initialization sequence frameworks (Skipping obsolete MySQL bridges)
     ensure_dependencies(backend_dir, env)
-    tunnel_proc = bootstrap_cloudflare_tunnel()
     trigger_rag_auto_ingest(backend_dir)
     
     # 5. Build standardized command execution pattern targeting app.main:app
@@ -131,12 +111,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n🛑 Shutdown process triggered.")
     finally:
-        print("🧹 Purging runtime locks and active cloudflared infrastructure tunnels...")
+        print("🧹 Purging active production server execution sub-processes...")
         process.terminate()
-        try:
-            tunnel_proc.terminate()
-        except NameError:
-            pass
 
 if __name__ == "__main__":
     main()

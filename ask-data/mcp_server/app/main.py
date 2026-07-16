@@ -35,8 +35,8 @@ def mcp_get_database_schema() -> str:
 @mcp.tool(name="execute_banking_query")
 def mcp_execute_banking_query(sql_query: str) -> str:
     """
-    Executes a read-only MySQL SELECT statement against the live bank analytics database 
-    through the secure tunnel and returns rows as a formatted JSON string.
+    Executes a read-only Cloudera Impala SELECT statement against the live big data 
+    analytics warehouse cluster and returns rows structured as a JSON string.
     """
     return execute_banking_query(sql_query)
 

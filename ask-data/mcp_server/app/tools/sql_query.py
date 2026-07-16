@@ -15,7 +15,7 @@ def execute_banking_query(sql_query: str) -> str:
     
     # --- MANDATORY SECURITY GUARDRAIL ---
     # Intercept and block any mutation attempts (DROP, DELETE, UPDATE, INSERT, ALTER, etc.)
-    forbidden_keywords = ["insert", "update", "delete", "drop", "alter", "truncate", "create", "grant"]
+    forbidden_keywords = ["insert", "update", "delete", "drop", "alter", "truncate", "create", "merge"]
     query_lower = query.lower()
     
     if any(keyword in query_lower for keyword in forbidden_keywords) or not query_lower.startswith("select"):

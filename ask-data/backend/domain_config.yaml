@@ -1,12 +1,11 @@
 # ask-data/backend/domain_config.yaml
 version: "1.0"
 domain: "Bank ABC Customer Analytics"
-database_type: "MySQL 8.0"
-database_name: "bank_abc_analytics"
+database_type: "Cloudera Impala"
+database_name: "default"
 
 tables:
   customers:
-    # 🔥 CRITICAL GUARDRAIL INJECTED DIRECTLY HERE
     description: |
       Contains core customer demographic profiles. 
       CRITICAL: This table does NOT have a 'status' column. If a user asks for 'active' customers, 
@@ -18,19 +17,19 @@ tables:
         description: "Unique internal identity tracking number and primary key for each customer."
         primary_key: true
       first_name:
-        type: "VARCHAR(50)"
+        type: "STRING"
         description: "The customer's first name."
       last_name:
-        type: "VARCHAR(50)"
+        type: "STRING"
         description: "The customer's last name or surname."
       email:
-        type: "VARCHAR(100)"
+        type: "STRING"
         description: "The electronic email address of the account holder."
       birth_date:
         type: "DATE"
         description: "Date of birth. Crucial for calculating age or identifying upcoming birthdays."
       bank_name:
-        type: "VARCHAR(50)"
+        type: "STRING"
         description: "The banking institution name (e.g., 'ABC', 'BNI'). Filter by this when queries specify a particular bank's customers."
       join_date:
         type: "DATE"
@@ -48,7 +47,7 @@ tables:
         description: "Foreign key linking this account back to the customer profile."
         references: "customers.customer_id"
       account_number:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "The unique public-facing alphanumeric bank account identifier number."
       balance:
         type: "DECIMAL(15,2)"
@@ -57,7 +56,7 @@ tables:
         type: "DECIMAL(4,2)"
         description: "The annual percentage yield interest tracking rate assigned to this savings account."
       status:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "Account state. Expected values are 'ACTIVE' or 'DORMANT'."
 
   deposits:
@@ -72,7 +71,7 @@ tables:
         description: "Foreign key mapping back to the customer profile record."
         references: "customers.customer_id"
       account_number:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "The unique account number identifier for this deposit facility."
       principal_amount:
         type: "DECIMAL(15,2)"
@@ -84,7 +83,7 @@ tables:
         type: "DECIMAL(4,2)"
         description: "The fixed contract interest rate paid out at maturity."
       status:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "The current status state of the investment term (e.g., 'ACTIVE')."
 
   loans:
@@ -99,7 +98,7 @@ tables:
         description: "Foreign key mapping back to the customer debtor record."
         references: "customers.customer_id"
       loan_type:
-        type: "VARCHAR(30)"
+        type: "STRING"
         description: "Type of loan facility (e.g., 'Home', 'Auto', 'Personal')."
       principal_amount:
         type: "DECIMAL(15,2)"
@@ -111,7 +110,7 @@ tables:
         type: "DATE"
         description: "The final payoff deadline date for the loan obligation."
       status:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "Operational loan indicator flag status state (e.g., 'ACTIVE')."
 
   credit_cards:
@@ -126,7 +125,7 @@ tables:
         description: "Foreign key tracking which customer owns the credit card account limit."
         references: "customers.customer_id"
       card_number:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "The unique plastic card PAN number format identifier sequence."
       credit_limit:
         type: "DECIMAL(15,2)"
@@ -138,7 +137,7 @@ tables:
         type: "DATE"
         description: "The operational expiration timeline date of the card."
       status:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "Revolving line risk indicators. Expected values are 'ACTIVE' or 'WARNING'."
 
   transactions:
@@ -149,19 +148,19 @@ tables:
         description: "Unique internal tracking sequential ledger primary key."
         primary_key: true
       account_number:
-        type: "VARCHAR(20)"
+        type: "STRING"
         description: "The account target number receiving or sending the asset allocation. Joins back to savings or deposits account numbers."
       amount:
         type: "DECIMAL(15,2)"
         description: "The absolute numerical money value of the execution."
       transaction_type:
-        type: "VARCHAR(10)"
+        type: "STRING"
         description: "Accounting ledger category direction indicator flags. Expected values are 'DEBIT' (withdrawals/charges) or 'CREDIT' (deposits/payroll)."
       transaction_timestamp:
-        type: "DATETIME"
+        type: "TIMESTAMP"
         description: "The complete system timestamp tracker of when the execution posted to the ledger."
       description:
-        type: "VARCHAR(255)"
+        type: "STRING"
         description: "The descriptive transaction text annotation (e.g., 'ATM Withdrawal', 'Payroll Transfer')."
 
   branch_performance:
@@ -172,10 +171,10 @@ tables:
         description: "Unique branch identifier primary key."
         primary_key: true
       branch_name:
-        type: "VARCHAR(50)"
+        type: "STRING"
         description: "The clean geographical or municipal name designation of the branch location."
       region:
-        type: "VARCHAR(50)"
+        type: "STRING"
         description: "The broader provincial administrative territory area grouping (e.g., 'DKI Jakarta')."
       total_active_customers:
         type: "INT"
@@ -186,12 +185,11 @@ tables:
 
 common_rules:
   temporal_queries:
-    birthday_this_week: "WHERE WEEK(birth_date) = WEEK(CURDATE())"
-    approaching_maturity: "WHERE maturity_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)"
+    birthday_this_week: "WHERE weekofyear(birth_date) = weekofyear(current_date())"
+    approaching_maturity: "WHERE maturity_date BETWEEN current_date() AND days_add(current_date(), 7)"
   
-  # 🔒 SIMPLIFIED: Bulletproof instruction layout for the model
   active_records: "Only apply status = 'ACTIVE' filters to the savings, deposits, loans, or credit_cards tables. Do NOT apply it to the customers table."
 
   security_guardrails:
     max_limit: "Always append 'LIMIT 100' to select queries if no explicit limit is requested by the user to protect system memory."
-    read_only: "Only allow SELECT operations. Forcefully block any incoming requests attempting to execute INSERT, UPDATE, DELETE, or DROP commands."
+    read_only: "Only allow SELECT operations. Forcefully block any incoming requests attempting to execute INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, or GRANT commands."

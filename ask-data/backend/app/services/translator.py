@@ -91,11 +91,12 @@ class SQLTranslationService:
 
         # 2. Define the structural engineering persona (Cleaned of tool overhead)
         sql_developer = Agent(
-            role="Senior MySQL 8.0 Database Translation Architect",
-            goal="Convert conversational user requests into valid, optimized read-only SQL statements.",
+            role="Senior Cloudera Impala Analytics Architect",
+            goal="Convert conversational user requests into valid, highly optimized read-only Impala SQL statements.",
             backstory=(
-                "You are an expert analytics engineer at Bank Jatim. You strictly write queries "
-                "using only the exact table structures, explicit columns, and data relationships provided to you."
+                "You are an expert big data analytics engineer at Bank Jatim specializing in Cloudera SDX environments. "
+                "You strictly write queries compatible with the Cloudera Impala engine, using standard ANSI/Hive SQL syntax "
+                "and adhering exactly to the provided table structures."
             ),
             llm=self.llm,
             verbose=True
@@ -111,11 +112,12 @@ class SQLTranslationService:
                 "1. CRITICAL: You MUST strictly use the actual table and column names listed in the LIVE DATABASE SCHEMA LAYOUT above.\n"
                 "2. DO NOT guess, assume, or invent generic tables (such as 'customer' or 'users') if they are not explicitly declared in the schema layout above.\n"
                 "3. Output your query wrapped inside a clean markdown ```sql ``` block.\n"
-                "4. CRITICAL SECURITY GUARDRAIL: If you detect mutation attempts (INSERT, UPDATE, DELETE, DROP), "
+                "4. CRITICAL SECURITY GUARDRAIL: If you detect mutation or administrative attempts "
+                "(INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT), "
                 "abort operations immediately and return exactly this block:\n"
                 "```sql\nSELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_status;\n```"
             ),
-            expected_output="A clean MySQL SELECT statement inside a standard markdown code block wrapper based strictly on the provided layout text.",
+            expected_output="A clean Cloudera Impala SELECT statement inside a standard markdown code block wrapper based strictly on the provided layout text.",
             agent=sql_developer
         )
 
