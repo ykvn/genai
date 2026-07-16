@@ -3,7 +3,6 @@ import sys
 import subprocess
 from pathlib import Path
 
-
 def ensure_dependencies(target_dir: Path, env: dict) -> None:
     """
     Validates and installs packages from requirements.txt directly 
@@ -26,39 +25,37 @@ def ensure_dependencies(target_dir: Path, env: dict) -> None:
         print(f"❌ Critical Error: Failed to configure dependencies: {str(e)}")
         sys.exit(1)
 
-
 def resolve_qwen_dir() -> Path:
     """Robustly finds the qwen_inference directory regardless of where CML launches the script."""
-    cwd = Path.cwd()[cite: 3]
+    cwd = Path.cwd()
     
     # Generate a list of probable locations for the app folder
     candidates = [
         Path(__file__).parent.resolve() if '__file__' in globals() else cwd,
         cwd / "qwen_inference",
         cwd / "ask-data" / "qwen_inference",
-    ][cite: 3]
+    ]
     
     # Return the first path that actually contains app/main.py
     for c in candidates:
         if (c / "app" / "main.py").exists():
             return c
             
-    print(f"❌ Critical Error: Could not locate 'app/main.py'. Are you sure the 'app' folder exists?")[cite: 3]
-    return cwd[cite: 3]
-
+    print(f"❌ Critical Error: Could not locate 'app/main.py'. Are you sure the 'app' folder exists?")
+    return cwd
 
 def main() -> None:
     # 1. Use the robust resolver to lock in the correct directory
-    qwen_dir = resolve_qwen_dir()[cite: 3]
-    os.chdir(qwen_dir)[cite: 3]
+    qwen_dir = resolve_qwen_dir()
+    os.chdir(qwen_dir)
     
     # 2. Enforce the dynamically allocated port
-    app_port = int(os.environ.get("CDSW_APP_PORT", 8100))
+    app_port = int(os.environ.get("CDSW_APP_PORT"))
     
     # 3. Inject PYTHONPATH
-    env = os.environ.copy()[cite: 3]
-    pythonpath = env.get("PYTHONPATH", "")[cite: 3]
-    env["PYTHONPATH"] = f"{qwen_dir}:{pythonpath}" if pythonpath else str(qwen_dir)[cite: 3]
+    env = os.environ.copy()
+    pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{qwen_dir}:{pythonpath}" if pythonpath else str(qwen_dir)
     
     # 4. Run standard dependency validation routine
     ensure_dependencies(qwen_dir, env)
@@ -75,20 +72,19 @@ def main() -> None:
         str(app_port),
         "--log-level",
         "info"
-    ][cite: 3]
+    ]
     
-    print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")[cite: 3]
-    print(f"📍 Resolved Working Directory: {qwen_dir}")[cite: 3]
+    print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
+    print(f"📍 Resolved Working Directory: {qwen_dir}")
     
     # Launch Uvicorn safely in its own process
-    process = subprocess.Popen(cmd, cwd=str(qwen_dir), env=env)[cite: 3]
+    process = subprocess.Popen(cmd, cwd=str(qwen_dir), env=env)
     
     try:
-        process.wait()[cite: 3]
+        process.wait()
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down Inference Server...")[cite: 3]
-        process.terminate()[cite: 3]
-
+        print("\n🛑 Shutting down Inference Server...")
+        process.terminate()
 
 if __name__ == "__main__":
-    main()[cite: 3]
+    main()

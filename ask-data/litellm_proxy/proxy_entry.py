@@ -66,7 +66,7 @@ def main() -> None:
     print(f"🔗 Target routing context successfully bound to: {os.environ['QWEN_APP_URL']}")
 
     # 3. Enforce the dynamically allocated port by the CML environment
-    app_port = int(os.environ.get("CDSW_APP_PORT", 8100))
+    app_port = int(os.environ.get("CDSW_APP_PORT"))
     
     # 4. Inject PYTHONPATH for isolated subprocess execution
     env = os.environ.copy()
