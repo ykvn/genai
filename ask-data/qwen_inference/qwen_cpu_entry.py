@@ -1,47 +1,24 @@
 import os
 import sys
-import torch
-import subprocess
-import time
-import threading
-import asyncio
 from typing import List
 from fastapi import FastAPI
 from pydantic import BaseModel
+import torch
 import uvicorn
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-def install_dependencies():
-    """Automatically installs packages from requirements.txt on startup"""
-    requirements_path = "requirements.txt"
-    if os.path.exists(requirements_path):
-        print("📦 Found requirements.txt. Ensuring all inference dependencies are installed...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
-        print("✅ Dependencies up to date.")
-    else:
-        print("⚠️ Warning: requirements.txt not found in current directory.")
-
 if __name__ == "__main__":
     # ⚡ CPU INFERENCE OPTIMIZATION LAYER
-    # Forces PyTorch to multi-thread calculations evenly across all 4 vCPUs
     torch.set_num_threads(4)
     torch.set_num_interop_threads(4)
     
-    # 🛠️ Safe Path Correction Layer (Matching your backend configuration)
-    if '__file__' in globals():
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-    else:
-        cml_default_inference = "/home/cdsw/ask-data/qwen_inference"
-        script_dir = cml_default_inference if os.path.exists(cml_default_inference) else os.getcwd()
-        
+    # 🛠️ Path Alignment Layer
+    script_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     os.chdir(script_dir)
     if script_dir not in sys.path:
         sys.path.insert(0, script_dir)
 
-    # 1. Self-heal inference dependencies first!
-    install_dependencies()
-
-    # 2. Bulletproof Directory Search for Model Weights
+    # 📂 Simplified Weights Directory Resolution
     base_cwd = os.getcwd()
     candidate_paths = [
         os.path.join(base_cwd, "model_weights_cpu"),
@@ -49,25 +26,17 @@ if __name__ == "__main__":
         os.path.join(base_cwd, "qwen_inference", "model_weights_cpu")
     ]
 
-    model_path = None
-    for path in candidate_paths:
-        if os.path.exists(path) and os.path.isdir(path):
-            if "config.json" in os.listdir(path):
-                model_path = path
-                break
-
+    model_path = next((p for p in candidate_paths if os.path.isdir(p) and "config.json" in os.listdir(p)), None)
     if not model_path:
-        print("❌ Critical Error: Could not locate 'model_weights_cpu' directory on disk.")
-        print(f"Searched target locations: {candidate_paths}")
+        print(f"❌ Critical Error: Could not locate 'model_weights_cpu' at: {candidate_paths}")
         sys.exit(1)
 
-    print(f"📍 Successfully located model weights folder at: {model_path}")
+    print(f"📍 Using model weights from: {model_path}")
 
     # --- SERVER INITIALIZATION ---
+    app = FastAPI(title="Qwen CPU OpenAI-Aligned Inference Engine")
 
-    app = FastAPI(title="Qwen 1.5B CPU OpenAI-Aligned Inference Engine")
-
-    print("⏳ Loading Qwen 1.5B model weights into system RAM...")
+    print("⏳ Loading model weights into RAM...")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
@@ -75,9 +44,9 @@ if __name__ == "__main__":
         torch_dtype=torch.float32,     
         low_cpu_mem_usage=True
     )
-    print("✅ Model successfully mapped to CPU layers.")
+    print("✅ Model loaded successfully.")
 
-    # --- ALIGNMENT SCHEMA MATCHING YOUR TRANSLATOR ---
+    # --- OPENAI ALIGNMENT SCHEMAS ---
     class ChatMessage(BaseModel):
         role: str
         content: str
@@ -89,16 +58,9 @@ if __name__ == "__main__":
 
     @app.post("/v1/chat/completions")
     def generate_sql_on_cpu(payload: OpenAIPayload):
-        system_prompt = ""
-        user_question = ""
-        
-        for msg in payload.messages:
-            if msg.role == "system":
-                system_prompt = msg.content
-            elif msg.role == "user":
-                user_question = msg.content
+        system_prompt = next((msg.content for msg in payload.messages if msg.role == "system"), "")
+        user_question = next((msg.content for msg in payload.messages if msg.role == "user"), "")
 
-        # 🔍 THE SMOKING GUN SENSOR: Print this to your Qwen Application logs
         print("\n=== 🚨 INCOMING SYSTEM CONTEXT RECEIVED BY QWEN ===")
         print(system_prompt)
         print("==================================================\n")
@@ -131,24 +93,7 @@ if __name__ == "__main__":
             }]
         }
 
-    # --- EXECUTION ENGINE BOUND TO LOGIC PARADIGM ---
-    app_port = int(os.getenv("CDSW_APP_PORT", 8001))
+    # --- DIRECT EXECUTION ---
+    app_port = int(os.getenv("CDSW_APP_PORT"))
     print(f"🌐 Starting Aligned CPU Inference Server on http://localhost:{app_port}")
-    
-    try:
-        asyncio.get_running_loop()
-        print("🔄 Active CML event loop detected. Launching inference server on isolated thread...")
-        
-        server_thread = threading.Thread(
-            target=lambda: uvicorn.run(app, host="localhost", port=app_port, log_level="info"),
-            daemon=True
-        )
-        server_thread.start()
-        
-        print("🚀 Model Server is live and listening!")
-        while server_thread.is_alive():
-            time.sleep(1)
-            
-    except RuntimeError:
-        # Fallback if context shifts to standard terminal environments
-        uvicorn.run(app, host="localhost", port=app_port, log_level="info")
+    uvicorn.run(app, host="localhost", port=app_port, log_level="info")
