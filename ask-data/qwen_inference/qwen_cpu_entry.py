@@ -120,8 +120,10 @@ if __name__ == "__main__":
     # strictly enforces the dynamically allocated port by the CML environment
     app_port = int(os.environ["CDSW_APP_PORT"])
     
-    # 🎯 Hardcoded, static path to avoid ASGI import errors.
-    # Uvicorn will explicitly look for "app" inside "qwen_cpu_entry.py".
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{script_dir}:{existing_pythonpath}" if existing_pythonpath else str(script_dir)
+    
     cmd = [
         sys.executable,
         "-m",
@@ -137,8 +139,8 @@ if __name__ == "__main__":
     
     print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
     
-    # Launch Uvicorn in a brand new isolated process
-    process = subprocess.Popen(cmd, cwd=script_dir, env=os.environ.copy())
+    # Launch Uvicorn using the patched 'env' we created above
+    process = subprocess.Popen(cmd, cwd=script_dir, env=env)
     
     try:
         process.wait()
