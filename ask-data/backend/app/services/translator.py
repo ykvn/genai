@@ -79,6 +79,41 @@ class SQLTranslationService:
             print(f"⚠️ Native MCP Protocol fetch failed: {str(e)}")
             return "Error: Unable to load structural layout matrix via protocol stream."
 
+    async def _execute_query_via_mcp(self, sql_query: str) -> str:
+        """
+        NATIVE MCP CLIENT ROUTINE: Connects to the /sse channel, initializes 
+        a session, and executes the generated query via the MCP execution tool.
+        """
+        sse_endpoint = f"{self.mcp_server_url.rstrip('/')}/sse"
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        
+        try:
+            async with sse_client(url=sse_endpoint, headers=headers) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+                    
+                    # Call the execution tool, passing the SQL string as a parameter
+                    result = await session.call_tool(
+                        "execute_banking_query", 
+                        arguments={"sql_query": sql_query}
+                    )
+                    
+                    if result and result.content:
+                        return result.content[0].text
+                    return "[]"
+        except Exception as e:
+            print(f"⚠️ Native MCP Query execution failed: {str(e)}")
+            return json.dumps([{"error": f"MCP Transmission Failure: {str(e)}"}])
+
+    def run_mcp_query(self, sql_query: str) -> list:
+        """Synchronous wrapper to execute the query and parse the JSON response."""
+        raw_json = asyncio.run(self._execute_query_via_mcp(sql_query))
+        try:
+            return json.loads(raw_json)
+        except Exception:
+            # Fallback if the server returned a plain string error message
+            return [{"execution_message": raw_json}]
+
     # =========================================================================
     # 📑 PATH A: OPTIMIZED TEXT-TO-SQL ENGINE (DIRECT CONTEXT INJECTION)
     # =========================================================================
