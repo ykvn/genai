@@ -3,6 +3,7 @@ import sys
 import subprocess
 from pathlib import Path
 from typing import List
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pydantic import BaseModel
 import torch
@@ -31,22 +32,39 @@ if not model_path:
     print(f"❌ Critical Error: Could not locate 'model_weights_cpu' at: {candidate_paths}")
     sys.exit(1)
 
-print(f"📍 Using model weights from: {model_path}")
+print(f"📍 Target model weights located at: {model_path}")
 
 # =========================================================================
-# 🚀 GLOBAL SERVER INITIALIZATION (Must be global for Uvicorn to import)
+# 🧠 DEFERRED MODEL LOADING (Prevents double-execution in subprocess)
 # =========================================================================
-app = FastAPI(title="Qwen CPU OpenAI-Aligned Inference Engine")
+# Set global placeholders so the route can access them later
+global_model = None
+global_tokenizer = None
 
-print("⏳ Loading model weights into RAM...")
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    device_map="cpu",              
-    dtype=torch.float32,           
-    low_cpu_mem_usage=True
-)
-print("✅ Model loaded successfully.")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global global_model, global_tokenizer
+    
+    # This block ONLY runs inside the Uvicorn worker process, saving your RAM!
+    print("⏳ [Lifespan Event] Loading Qwen weights into system RAM...")
+    global_tokenizer = AutoTokenizer.from_pretrained(model_path)
+    global_model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        device_map="cpu",              
+        dtype=torch.float32,           
+        low_cpu_mem_usage=True
+    )
+    print("✅ [Lifespan Event] Model successfully loaded and ready for inference.")
+    
+    yield  # The server handles requests while yielding here
+    
+    # Cleanup when Uvicorn shuts down
+    print("🧹 [Lifespan Event] Shutting down and clearing RAM...")
+    global_model = None
+    global_tokenizer = None
+
+# 🚀 Pass the lifespan to the FastAPI app initialization
+app = FastAPI(title="Qwen CPU OpenAI-Aligned Inference Engine", lifespan=lifespan)
 
 # --- OPENAI ALIGNMENT SCHEMAS ---
 class ChatMessage(BaseModel):
@@ -72,11 +90,11 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
         {"role": "user", "content": user_question}
     ]
     
-    text = tokenizer.apply_chat_template(formatted_messages, tokenize=False, add_generation_prompt=True)
-    model_inputs = tokenizer([text], return_tensors="pt").to("cpu")
+    text = global_tokenizer.apply_chat_template(formatted_messages, tokenize=False, add_generation_prompt=True)
+    model_inputs = global_tokenizer([text], return_tensors="pt").to("cpu")
     
     with torch.no_grad():
-        generated_ids = model.generate(
+        generated_ids = global_model.generate(
             **model_inputs,
             max_new_tokens=256,
             temperature=0.1,
@@ -84,7 +102,7 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
         )
     
     generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)]
-    response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    response = global_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     
     return {
         "choices": [{
@@ -119,6 +137,7 @@ if __name__ == "__main__":
     
     print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
     
+    # Launch Uvicorn in a brand new isolated process
     process = subprocess.Popen(cmd, cwd=script_dir, env=os.environ.copy())
     
     try:
