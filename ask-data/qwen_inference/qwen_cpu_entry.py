@@ -102,15 +102,13 @@ if __name__ == "__main__":
     # strictly enforces the dynamically allocated port by the CML environment
     app_port = int(os.environ["CDSW_APP_PORT"])
     
-    # Dynamically grab the name of this python file (e.g., 'qwen_cpu_entry') 
-    # so Uvicorn knows exactly what module to import the 'app' from.
-    module_name = Path(__file__).stem if '__file__' in globals() else "qwen_cpu_entry"
-    
+    # 🎯 Hardcoded, static path to avoid ASGI import errors.
+    # Uvicorn will explicitly look for "app" inside "qwen_cpu_entry.py".
     cmd = [
         sys.executable,
         "-m",
         "uvicorn",
-        f"{module_name}:app",       
+        "qwen_cpu_entry:app",       
         "--host",
         "127.0.0.1",
         "--port",
@@ -121,6 +119,10 @@ if __name__ == "__main__":
     
     print(f"🌐 Starting Aligned CPU Inference Server via subprocess on http://127.0.0.1:{app_port}")
     
-    # Launch Uvicorn in a brand new isolated process to dodge notebook asyncio loops
     process = subprocess.Popen(cmd, cwd=script_dir, env=os.environ.copy())
-    process.wait()
+    
+    try:
+        process.wait()
+    except KeyboardInterrupt:
+        print("\n🛑 Shutting down Inference Server...")
+        process.terminate()
