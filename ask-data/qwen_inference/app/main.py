@@ -88,3 +88,8 @@ def generate_sql_on_cpu(payload: OpenAIPayload):
     return {
         "choices": [{"message": {"role": "assistant", "content": response.strip()}}]
     }
+
+@app.get("/")
+def health_check():
+    """Satisfies CML platform health checks to prevent 404 logs."""
+    return {"status": "ok", "message": "Qwen Inference Engine is running"}
