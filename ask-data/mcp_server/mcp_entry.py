@@ -49,7 +49,7 @@ def main() -> None:
     os.chdir(mcp_dir)
     
     # 2. Extract the dynamically allocated port by the CML environment
-    app_port = int(os.environ.get("CDSW_APP_PORT", 8100))
+    app_port = int(os.environ.get("CDSW_APP_PORT"))
     
     # 3. Patch environment variables with absolute PYTHONPATH injections
     env = os.environ.copy()
