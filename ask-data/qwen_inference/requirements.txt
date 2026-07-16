@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-transformers
-accelerate
-torch
 pydantic
+torch
+transformers
