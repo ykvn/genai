@@ -82,7 +82,7 @@ def main() -> None:
     pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = f"{backend_dir}:{pythonpath}" if pythonpath else str(backend_dir)
     
-    # 4. Process initialization sequence frameworks (Skipping obsolete MySQL bridges)
+    # 4. Process initialization sequence frameworks
     ensure_dependencies(backend_dir, env)
     trigger_rag_auto_ingest(backend_dir)
     
