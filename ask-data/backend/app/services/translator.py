@@ -1,7 +1,8 @@
 import os
 import sys
 import json
-import urllib.request
+import asyncio
+from pathlib import Path
 
 # 🩹 ENTERPRISE LINUX RUNTIME PATCH: Force modern SQLite layers before importing ChromaDB
 try:
@@ -15,6 +16,10 @@ from sentence_transformers import SentenceTransformer
 
 # 🤖 CrewAI Framework Engine Integration Modules
 from crewai import Agent, Task, Crew, Process, LLM
+
+# 🔌 Official Model Context Protocol Client Packages
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 class SQLTranslationService:
     def __init__(self):
@@ -48,27 +53,41 @@ class SQLTranslationService:
         self.chroma_client = chromadb.PersistentClient(path=self.chroma_dir)
         self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name)
 
+    async def _fetch_schema_via_mcp(self) -> str:
+        """
+        NATIVE MCP CLIENT ROUTINE: Connects directly to the universal /sse channel, 
+        initializes a session, and calls the schema tool over the standardized protocol.
+        """
+        sse_endpoint = f"{self.mcp_server_url.rstrip('/')}/sse"
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        
+        try:
+            # Connect natively to the universal protocol stream channel
+            async with sse_client(url=sse_endpoint, headers=headers) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    # Perform official protocol initialization handshake
+                    await session.initialize()
+                    
+                    # Call the tool directly by its registered name payload
+                    result = await session.call_tool("get_database_schema")
+                    
+                    # Extract contents cleanly without manual JSON parsing keys
+                    if result and result.content:
+                        return result.content[0].text
+                    return "Error: Empty schema content returned from protocol channel."
+        except Exception as e:
+            print(f"⚠️ Native MCP Protocol fetch failed: {str(e)}")
+            return "Error: Unable to load structural layout matrix via protocol stream."
+
     # =========================================================================
     # 📑 PATH A: OPTIMIZED TEXT-TO-SQL ENGINE (DIRECT CONTEXT INJECTION)
     # =========================================================================
     def generate_sql(self, user_question: str) -> str:
         """Deterministic execution pipeline that forces schema adherence for compact models."""
         
-        # 1. Force Python to fetch the schema directly from the MCP Server upfront
-        print("📡 Fetching database schema layout from MCP cluster network...")
-        target_mcp_endpoint = f"{self.mcp_server_url}/api/test/schema"
-        try:
-            req = urllib.request.Request(
-                target_mcp_endpoint,
-                headers={"Authorization": f"Bearer {self.api_token}"},
-                method="GET"
-            )
-            with urllib.request.urlopen(req, timeout=10) as response:
-                schema_data = json.loads(response.read().decode("utf-8"))
-                db_schema_layout = schema_data.get("raw_yaml_configuration", "")
-        except Exception as e:
-            print(f"⚠️ Schema fetch fallback triggered: {str(e)}")
-            db_schema_layout = "Error: Unable to load structural layout matrix."
+        # 1. Authentic protocol tool execution call via asyncio event loop execution bridges
+        print("📡 Fetching database schema layout natively over MCP protocol streams...")
+        db_schema_layout = asyncio.run(self._fetch_schema_via_mcp())
 
         # 2. Define the structural engineering persona (Cleaned of tool overhead)
         sql_developer = Agent(
