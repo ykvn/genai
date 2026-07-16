@@ -120,39 +120,34 @@ class SQLTranslationService:
     def generate_sql(self, user_question: str) -> str:
         """Deterministic execution pipeline that forces schema adherence for compact models."""
         
-        # 1. Authentic protocol tool execution call via asyncio event loop execution bridges
-        print("📡 Fetching database schema layout natively over MCP protocol streams...")
-        db_schema_layout = asyncio.run(self._fetch_schema_via_mcp())
+        # 1. Fetch unified blueprint (Schema + Centralized Guardrails) over MCP
+        print("📡 Fetching unified database blueprint natively over MCP protocol streams...")
+        db_blueprint = asyncio.run(self._fetch_schema_via_mcp())
 
-        # 2. Define the structural engineering persona (Cleaned of tool overhead)
+        # 2. Define the structural engineering persona
         sql_developer = Agent(
             role="Senior Cloudera Impala Analytics Architect",
             goal="Convert conversational user requests into valid, highly optimized read-only Impala SQL statements.",
             backstory=(
                 "You are an expert big data analytics engineer at Bank Jatim specializing in Cloudera SDX environments. "
                 "You strictly write queries compatible with the Cloudera Impala engine, using standard ANSI/Hive SQL syntax "
-                "and adhering exactly to the provided table structures."
+                "and adhering exactly to the provided database blueprint rules."
             ),
             llm=self.llm,
             verbose=True
         )
 
-        # 3. Inject the schema layout directly into the Task description text
+        # 3. Streamlined Task targeting the centralized blueprint rules
         draft_sql_task = Task(
             description=(
                 f"Process the following user query: '{user_question}'.\n\n"
-                f"📊 VERIFIED LIVE DATABASE SCHEMA LAYOUT:\n"
-                f"{db_schema_layout}\n\n"
-                "OPERATIONAL BOUNDARIES:\n"
-                "1. CRITICAL: You MUST strictly use the actual table and column names listed in the LIVE DATABASE SCHEMA LAYOUT above.\n"
-                "2. DO NOT guess, assume, or invent generic tables (such as 'customer' or 'users') if they are not explicitly declared in the schema layout above.\n"
-                "3. Output your query wrapped inside a clean markdown ```sql ``` block.\n"
-                "4. CRITICAL SECURITY GUARDRAIL: If you detect mutation or administrative attempts "
-                "(INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, GRANT), "
-                "abort operations immediately and return exactly this block:\n"
-                "```sql\nSELECT 'CRITICAL_SECURITY_ALERT: Unauthorized Command Blocked' AS security_status;\n```"
+                f"📊 UNIFIED DATABASE BLUEPRINT & SYSTEM OPERATIONAL RULES:\n"
+                f"{db_blueprint}\n\n"
+                "INSTRUCTION: You must strictly read, respect, and execute your response according "
+                "to the metadata layouts, formatting rules, and security boundaries specified in the "
+                "UNIFIED DATABASE BLUEPRINT above."
             ),
-            expected_output="A clean Cloudera Impala SELECT statement inside a standard markdown code block wrapper based strictly on the provided layout text.",
+            expected_output="A clean Cloudera Impala SELECT statement matching the formatting rules and constraints defined in the blueprint context.",
             agent=sql_developer
         )
 
@@ -166,7 +161,7 @@ class SQLTranslationService:
         print("⏳ Initiating autonomous CrewAI execution pipeline via LiteLLM application layer...")
         ai_result = str(orchestration_crew.kickoff()).strip()
 
-        # Extract the pure query string from the markdown blocks for downstream execution compatibility
+        # Extract the pure query string from markdown blocks
         if "```sql" in ai_result:
             return ai_result.split("```sql")[1].split("```")[0].strip()
         elif "SELECT" in ai_result.upper():
