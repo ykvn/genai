@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 
-from app.core.ingest import build_ingest_config, run_auto_ingest
+from app.core.ingest_knowledge import build_ingest_config, run_auto_ingest
 
 
 def main() -> None:

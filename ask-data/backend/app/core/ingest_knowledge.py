@@ -63,17 +63,15 @@ def run_auto_ingest(docs_dir: str, persist_dir: str, collection_name: str):
     a clean re-index of all policy manuals directly into ChromaDB.
     """
     chroma_client = chromadb.PersistentClient(path=persist_dir)
-    
-    # 🔄 CLEAN OVERWRITE STRATEGY: Wipe out the old index structure if it exists
+
     try:
         chroma_client.delete_collection(name=collection_name)
         print(f"🧹 [RAG ENGINE] Flushed old vector collection cache: '{collection_name}'")
     except Exception:
-        pass # Collection didn't exist yet, safe to proceed
-        
+        pass
+
     collection = chroma_client.get_or_create_collection(name=collection_name)
 
-    # Inspect filesystem for asset targets
     if not os.path.exists(docs_dir):
         print(f"⚠️ [RAG ENGINE] Targeted directory path does not exist: '{docs_dir}'. Sync cycle suspended.")
         return
@@ -91,21 +89,20 @@ def run_auto_ingest(docs_dir: str, persist_dir: str, collection_name: str):
     for pdf_file in pdf_files:
         file_path = os.path.join(docs_dir, pdf_file)
         print(f"📄 [RAG ENGINE] Re-indexing asset parameters from: {pdf_file}")
-        
+
         try:
             reader = PdfReader(file_path)
             raw_document_text = ""
-            
+
             for page in reader.pages:
                 extracted_text = page.extract_text()
                 if extracted_text:
                     raw_document_text += extracted_text + "\n"
 
-            # Structural text segmentation block
             chunk_size = 1500
             overlap = 300
             text_fragments = []
-            
+
             for i in range(0, len(raw_document_text), chunk_size - overlap):
                 fragment = raw_document_text[i:i + chunk_size].strip()
                 if len(fragment) > 50:
@@ -116,20 +113,20 @@ def run_auto_ingest(docs_dir: str, persist_dir: str, collection_name: str):
 
             print(f"✂️ [RAG ENGINE] Fragmented {pdf_file} into {len(text_fragments)} segments. Generating embeddings...")
             vector_embeddings = embedding_model.encode(text_fragments).tolist()
-            
+
             document_ids = [f"chunk_{global_chunk_counter + idx}" for idx in range(len(text_fragments))]
             metadata_payloads = [{"source_file": pdf_file} for _ in text_fragments]
-            
+
             collection.add(
                 documents=text_fragments,
                 embeddings=vector_embeddings,
                 metadatas=metadata_payloads,
-                ids=document_ids
+                ids=document_ids,
             )
-            
+
             global_chunk_counter += len(text_fragments)
             print(f"💾 [RAG ENGINE] Successfully committed {len(text_fragments)} vector items for {pdf_file} to disk storage.")
-            
+
         except Exception as file_error:
             print(f"❌ [RAG ENGINE] Error parsing file {pdf_file}: {str(file_error)}")
             continue

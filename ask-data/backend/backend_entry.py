@@ -3,7 +3,7 @@ import sys
 import subprocess
 from pathlib import Path
 
-from app.core.ingest import build_ingest_config, run_auto_ingest
+from app.core.ingest_knowledge import build_ingest_config, run_auto_ingest
 
 def ensure_dependencies(backend_dir: Path, env: dict) -> None:
     """
