@@ -3,7 +3,15 @@ import sys
 import subprocess
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parent
+
+def _resolve_backend_dir() -> Path:
+    """Resolve the backend root whether the file is executed as a script or imported in a notebook."""
+    if "__file__" in globals():
+        return Path(__file__).resolve().parent
+    return Path.cwd()
+
+
+BACKEND_DIR = _resolve_backend_dir()
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
