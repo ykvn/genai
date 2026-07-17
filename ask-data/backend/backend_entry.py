@@ -6,9 +6,28 @@ from pathlib import Path
 
 def _resolve_backend_dir() -> Path:
     """Resolve the backend root whether the file is executed as a script or imported in a notebook."""
+    candidates = []
+
+    if "__file__" in globals():
+        candidates.append(Path(__file__).resolve().parent)
+
+    cwd = Path.cwd()
+    candidates.extend([
+        cwd,
+        cwd / "backend",
+        cwd / "ask-data" / "backend",
+        cwd / "ask-data",
+        Path("/home/cdsw/ask-data/backend"),
+    ])
+
+    for candidate in candidates:
+        candidate_path = candidate.resolve() if hasattr(candidate, "resolve") else Path(candidate)
+        if (candidate_path / "app" / "__init__.py").exists() or (candidate_path / "app" / "main.py").exists():
+            return candidate_path
+
     if "__file__" in globals():
         return Path(__file__).resolve().parent
-    return Path.cwd()
+    return cwd
 
 
 BACKEND_DIR = _resolve_backend_dir()
