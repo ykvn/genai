@@ -15,7 +15,7 @@ class SQLTranslationService:
         self.mcp_server_url = os.getenv("MCP_SERVER_URL")
         
         # 🔌 LiteLLM Connection Point: Point strictly to loopback interface mapping targets
-        self.qwen_base_url = os.getenv("QWEN_BASE_URL").rstrip("/")
+        self.qwen_base_url = (os.getenv("QWEN_BASE_URL") or "").rstrip("/")
         
         # 🔑 Security Access Handshake Tokens
         self.api_token = os.getenv("CML_TOKEN") or os.getenv("QWEN_API_KEY") or "litellm-dummy-token"
@@ -108,13 +108,18 @@ class SQLTranslationService:
 
         print("⏳ Initiating autonomous CrewAI execution pipeline via LiteLLM application layer...")
         ai_result = str(orchestration_crew.kickoff()).strip()
+        return self._extract_sql_from_response(ai_result)
 
-        # Extract the pure query string from markdown blocks for downstream execution
+    @staticmethod
+    def _extract_sql_from_response(ai_result: str) -> str:
+        """Normalize CrewAI output into a plain SQL statement when possible."""
+        ai_result = str(ai_result).strip()
+
         if "```sql" in ai_result:
             return ai_result.split("```sql")[1].split("```")[0].strip()
-        elif "SELECT" in ai_result.upper():
+        if "SELECT" in ai_result.upper():
             return ai_result.replace("```", "").strip()
-        
+
         return ai_result
 
     # =========================================================================
