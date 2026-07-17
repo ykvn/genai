@@ -14,6 +14,9 @@ import chromadb
 # Leverage Chroma's built-in local transformer pipeline
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
+# Explicitly import the centralized settings object to resolve the NameError
+from app.tools.config import settings
+
 _client: chromadb.PersistentClient | None = None
 
 def _get_client() -> chromadb.PersistentClient:
