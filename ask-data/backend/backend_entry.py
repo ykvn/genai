@@ -3,6 +3,10 @@ import sys
 import subprocess
 from pathlib import Path
 
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from app.core.ingest_knowledge import build_ingest_config, run_auto_ingest
 
 def ensure_dependencies(backend_dir: Path, env: dict) -> None:
