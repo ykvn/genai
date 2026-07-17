@@ -16,8 +16,9 @@ from fastmcp import FastMCP
 from mcp.server.sse import SseServerTransport
 
 # --- ACTIVE TOOL REGISTRATION ---
+from app.tools.config import settings  # Centralized application configuration settings
 from app.tools.sql_query import execute_banking_query, get_database_schema
-from app.tools.chroma_client import search_documents  # 📚 Standardized vector client
+from app.tools.chroma_client import search_documents  # Standardized vector client
 from app.tools.dormant_risk import calculate_dormant_account_risk
 
 # 1. Initialize the central FastMCP application state
@@ -48,7 +49,8 @@ def mcp_search_policy_documents(query: str) -> str:
     Performs a semantic vector distance search against local persistent enterprise banking manuals,
     compliance guidelines, and SOP documentation (ChromaDB) to return matching structural context fragments.
     """
-    collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
+    # 🔌 Read collection properties out of the central Pydantic schema
+    collection_name = settings.chroma_collection
     
     # Execute the standardized client query routine
     raw_results = search_documents(query=query, collection_name=collection_name, top_k=3)
@@ -114,6 +116,7 @@ def test_sql_tool(sql_query: str):
 @app.post("/api/test/rag")
 def test_rag_tool(search_query: str):
     """Interactive playground to test your search_policy_documents tool"""
-    collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
+    # 🔌 Streamline Swagger test execution parameters using the updated settings handle
+    collection_name = settings.chroma_collection
     raw_results = search_documents(query=search_query, collection_name=collection_name, top_k=3)
     return {"status": "success", "matched_context": raw_results}
