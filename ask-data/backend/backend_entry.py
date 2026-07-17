@@ -35,7 +35,7 @@ def trigger_rag_auto_ingest(backend_dir: Path) -> None:
         from app.core.ingest import run_auto_ingest
         
         persist_dir = os.getenv("CHROMA_PERSIST_DIR", str(backend_dir / "chroma_db"))
-        collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
+        collection_name = os.getenv("CHROMA_COLLECTION", "bank_abc_knowledge")
         
         docs_dir = os.path.abspath(os.path.join(str(backend_dir), "..", "data", "documents"))
         if not os.path.exists(docs_dir):
