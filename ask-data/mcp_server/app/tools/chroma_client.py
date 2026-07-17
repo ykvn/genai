@@ -1,31 +1,42 @@
 from __future__ import annotations
 
-import os
 import sys
+import os
+from pathlib import Path
 
-# 🩹 ENTERPRISE LINUX RUNTIME PATCH: Force modern SQLite layers immediately
+# 🩹 ENTERPRISE RUNTIME PATCH 1: Force modern SQLite layers immediately
 try:
     import pysqlite3  # type: ignore
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
 
+# 🩹 ENTERPRISE RUNTIME PATCH 2: Guarantee direct sibling resolution for tools
+# This injects the 'tools' directory context straight into the execution path
+tools_directory = str(Path(__file__).parent.resolve())
+if tools_directory not in sys.path:
+    sys.path.insert(0, tools_directory)
+
 import chromadb
-# Leverage Chroma's built-in local transformer pipeline
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
-# Explicitly import the centralized settings object to resolve the NameError
-from .config import settings
+# 🔌 Now we can import the config module cleanly as a direct local script resource
+import config
+settings = config.settings
 
 _client: chromadb.PersistentClient | None = None
 
+
 def _get_client() -> chromadb.PersistentClient:
+    """Singleton connection routine ensuring a single persistent disk handle."""
     global _client
     if _client is None:
         _client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
     return _client
 
+
 def _embedding_fn() -> SentenceTransformerEmbeddingFunction:
+    """Initializes local embedding weights matching your verified configuration layer."""
     return SentenceTransformerEmbeddingFunction(model_name=settings.chroma_model)
 
 
@@ -52,7 +63,6 @@ def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[d
             # Transform distance arrays into clean 0.0 - 1.0 Similarity Scores
             score = round(1 - dist, 4) if dist is not None else None
             
-            # Dynamic safety defaults if metadata objects are thin
             source_file = meta.get("source_file", meta.get("source", "Unknown_Document"))
             page_num = meta.get("page", "?")
             
