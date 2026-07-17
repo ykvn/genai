@@ -3,6 +3,8 @@ import sys
 import subprocess
 from pathlib import Path
 
+from app.core.ingest import build_ingest_config, run_auto_ingest
+
 def ensure_dependencies(backend_dir: Path, env: dict) -> None:
     """
     Validates and installs packages from requirements.txt directly 
@@ -25,30 +27,22 @@ def ensure_dependencies(backend_dir: Path, env: dict) -> None:
         print(f"❌ Critical Error: Failed to configure dependencies: {str(e)}")
         sys.exit(1)
 
-def trigger_rag_auto_ingest(backend_dir: Path) -> None:
+def trigger_rag_auto_ingest(backend_dir: Path, env: dict | None = None) -> None:
     """Database Synchronization. Pre-populates ChromaDB vector maps."""
     print("\n📡 [RAG STARTUP] Synchronizing Knowledge Base document vector nodes...")
     try:
-        # Guarantee local module availability for ingestion routine execution
         if str(backend_dir) not in sys.path:
             sys.path.insert(0, str(backend_dir))
-        from app.core.ingest import run_auto_ingest
-        
-        persist_dir = os.getenv("CHROMA_PERSIST_DIR", str(backend_dir / "chroma_db"))
-        collection_name = os.getenv("CHROMA_COLLECTION", "bank_abc_knowledge")
-        
-        docs_dir = os.path.abspath(os.path.join(str(backend_dir), "..", "data", "documents"))
-        if not os.path.exists(docs_dir):
-            docs_dir = "/home/cdsw/ask-data/data/documents"
 
-        print(f"[RAG STARTUP] Scanning file directory target: {docs_dir}")
+        config = build_ingest_config(backend_dir=backend_dir, env=env)
+        print(f"[RAG STARTUP] Scanning file directory target: {config['docs_dir']}")
         run_auto_ingest(
-            docs_dir=docs_dir,
-            persist_dir=persist_dir,
-            collection_name=collection_name
+            docs_dir=config["docs_dir"],
+            persist_dir=config["persist_dir"],
+            collection_name=config["collection_name"],
         )
         print("[RAG STARTUP] Document processing loop verified successfully.\n")
-        
+
     except Exception as e:
         print(f"⚠️ [RAG STARTUP WARNING] Vector synchronization bypassed: {str(e)}\n")
 
@@ -84,7 +78,7 @@ def main() -> None:
     
     # 4. Process initialization sequence frameworks
     ensure_dependencies(backend_dir, env)
-    trigger_rag_auto_ingest(backend_dir)
+    trigger_rag_auto_ingest(backend_dir, env=env)
     
     # 5. Build standardized command execution pattern targeting app.main:app
     cmd = [

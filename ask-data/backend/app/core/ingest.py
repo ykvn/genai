@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 try:
     __import__('pysqlite3')
@@ -10,6 +11,51 @@ except ImportError:
 import chromadb
 from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
+
+
+def _load_env_file(backend_dir) -> dict[str, str]:
+    """Load simple KEY=VALUE entries from the nearest .env files."""
+    backend_path = Path(backend_dir).resolve()
+    candidates = [
+        backend_path / ".env",
+        backend_path.parent / ".env",
+        backend_path.parent / "mcp_server" / ".env",
+        backend_path.parent.parent / "mcp_server" / ".env",
+    ]
+
+    values: dict[str, str] = {}
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+        break
+    return values
+
+
+def build_ingest_config(backend_dir, env=None):
+    """Resolve the document and Chroma settings used for ingestion."""
+    backend_path = os.path.abspath(str(backend_dir))
+    env_map = dict(env or os.environ)
+    env_map.update(_load_env_file(backend_path))
+
+    persist_dir = env_map.get("CHROMA_PERSIST_DIR", str(os.path.join(backend_path, "chroma_db")))
+    collection_name = env_map.get("CHROMA_COLLECTION", "bank_abc_knowledge")
+
+    docs_dir = os.path.abspath(os.path.join(backend_path, "..", "data", "documents"))
+    if not os.path.exists(docs_dir):
+        docs_dir = "/home/cdsw/ask-data/data/documents"
+
+    return {
+        "docs_dir": docs_dir,
+        "persist_dir": persist_dir,
+        "collection_name": collection_name,
+    }
+
 
 def run_auto_ingest(docs_dir: str, persist_dir: str, collection_name: str):
     """

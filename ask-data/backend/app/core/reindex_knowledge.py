@@ -1,0 +1,29 @@
+import os
+import sys
+from pathlib import Path
+
+from app.core.ingest import build_ingest_config, run_auto_ingest
+
+
+def main() -> None:
+    backend_dir = Path(__file__).resolve().parents[2]
+    if str(backend_dir) not in sys.path:
+        sys.path.insert(0, str(backend_dir))
+
+    env = os.environ.copy()
+    config = build_ingest_config(backend_dir=backend_dir, env=env)
+
+    print("🔄 Re-indexing knowledge base...")
+    print(f"- docs dir: {config['docs_dir']}")
+    print(f"- persist dir: {config['persist_dir']}")
+    print(f"- collection: {config['collection_name']}")
+
+    run_auto_ingest(
+        docs_dir=config["docs_dir"],
+        persist_dir=config["persist_dir"],
+        collection_name=config["collection_name"],
+    )
+
+
+if __name__ == "__main__":
+    main()
