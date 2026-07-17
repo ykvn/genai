@@ -2,27 +2,32 @@ from __future__ import annotations
 
 import sys
 import os
+import importlib.util
 from pathlib import Path
 
 # 🩹 ENTERPRISE RUNTIME PATCH 1: Force modern SQLite layers immediately
 try:
     import pysqlite3  # type: ignore
-    sys.modules["sqlite3"] = pysqlite3
+    sys.modules["sqlite3"] = sys.modules.pop('pysqlite3')
 except ImportError:
     pass
 
-# 🩹 ENTERPRISE RUNTIME PATCH 2: Guarantee direct sibling resolution for tools
-# This injects the 'tools' directory context straight into the execution path
-tools_directory = str(Path(__file__).parent.resolve())
-if tools_directory not in sys.path:
-    sys.path.insert(0, tools_directory)
+# 🩹 ENTERPRISE RUNTIME PATCH 2: Bulletproof Direct File System Module Loader
+# Bypasses package resolution anomalies entirely by parsing the sibling file directly from disk
+config_file_path = Path(__file__).parent.resolve() / "config.py"
+if not config_file_path.exists():
+    print(f"❌ Critical Configuration Error: Sibling script missing at absolute location: {config_file_path}")
+    sys.exit(1)
 
+# Dynamically compile and mount the file contents into memory
+spec = importlib.util.spec_from_file_location("local_mcp_config", str(config_file_path))
+config_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(config_module)
+settings = config_module.settings
+
+# --- Core Dependencies ---
 import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-
-# 🔌 Now we can import the config module cleanly as a direct local script resource
-import config
-settings = config.settings
 
 _client: chromadb.PersistentClient | None = None
 
