@@ -29,7 +29,6 @@ def _resolve_backend_dir() -> Path:
         return Path(__file__).resolve().parent
     return cwd
 
-
 BACKEND_DIR = _resolve_backend_dir()
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -77,26 +76,9 @@ def trigger_rag_auto_ingest(backend_dir: Path, env: dict | None = None) -> None:
     except Exception as e:
         print(f"⚠️ [RAG STARTUP WARNING] Vector synchronization bypassed: {str(e)}\n")
 
-def resolve_backend_dir() -> Path:
-    """Robustly finds the backend directory regardless of where CML launches the script."""
-    cwd = Path.cwd()
-    candidates = [
-        Path(__file__).parent.resolve() if '__file__' in globals() else cwd,
-        cwd / "backend",
-        cwd / "ask-data" / "backend",
-        Path("/home/cdsw/ask-data/backend")
-    ]
-    
-    for c in candidates:
-        if (c / "app" / "main.py").exists():
-            return c
-            
-    print(f"❌ Critical Error: Could not locate 'app/main.py'. Defaulting context to root.")
-    return cwd
-
 def main() -> None:
     # 1. Lock execution environment down to the correct path context
-    backend_dir = resolve_backend_dir()
+    backend_dir = _resolve_backend_dir()
     os.chdir(backend_dir)
     
     # 2. Extract port specifications allocated dynamically by the environment
