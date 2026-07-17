@@ -1,4 +1,6 @@
+import os
 import sys
+import json
 
 # 🩹 CRITICAL STEP 1: Swap out the outdated system SQLite layer immediately!
 # This MUST execute before any tools or third-party packages are imported.
@@ -15,7 +17,7 @@ from mcp.server.sse import SseServerTransport
 
 # --- ACTIVE TOOL REGISTRATION ---
 from app.tools.sql_query import execute_banking_query, get_database_schema
-from app.tools.rag_search import perform_rag_search
+from app.tools.chroma_client import search_documents  # 📚 Standardized vector client
 from app.tools.dormant_risk import calculate_dormant_account_risk
 
 # 1. Initialize the central FastMCP application state
@@ -40,13 +42,19 @@ def mcp_execute_banking_query(sql_query: str) -> str:
     """
     return execute_banking_query(sql_query)
 
-@mcp.tool(name="search_policy_knowledge_base")
-def mcp_search_policy_knowledge_base(query: str) -> str:
+@mcp.tool(name="search_policy_documents")
+def mcp_search_policy_documents(query: str) -> str:
     """
-    Scans through internal unstructured enterprise banking policies, compliance guidelines, 
-    and SOP documents to return relevant textual contextual snippets for a given query.
+    Performs a semantic vector distance search against local persistent enterprise banking manuals,
+    compliance guidelines, and SOP documentation (ChromaDB) to return matching structural context fragments.
     """
-    return perform_rag_search(query)
+    collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
+    
+    # Execute the standardized client query routine
+    raw_results = search_documents(query=query, collection_name=collection_name, top_k=3)
+    
+    # Return cleanly serialized payload over the protocol channel
+    return json.dumps(raw_results, default=str)
 
 @mcp.tool(name="evaluate_dormant_account_risk")
 def mcp_evaluate_dormant_account_risk(days_inactive: int, account_balance: float, sudden_withdrawal_amount: float = 0.0) -> str:
@@ -97,7 +105,6 @@ def test_schema_tool():
 @app.post("/api/test/sql")
 def test_sql_tool(sql_query: str):
     """Interactive playground to test your execute_banking_query tool"""
-    import json
     raw_result = execute_banking_query(sql_query)
     try:
         return {"status": "success", "data": json.loads(raw_result)}
@@ -106,5 +113,7 @@ def test_sql_tool(sql_query: str):
 
 @app.post("/api/test/rag")
 def test_rag_tool(search_query: str):
-    """Interactive playground to test your search_policy_knowledge_base tool"""
-    return {"status": "success", "matched_context": perform_rag_search(search_query)}
+    """Interactive playground to test your search_policy_documents tool"""
+    collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
+    raw_results = search_documents(query=search_query, collection_name=collection_name, top_k=3)
+    return {"status": "success", "matched_context": raw_results}

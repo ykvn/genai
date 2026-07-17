@@ -1,21 +1,9 @@
 import os
-import sys
 import json
 import asyncio
-from pathlib import Path
-
-# 🩹 ENTERPRISE LINUX RUNTIME PATCH: Force modern SQLite layers before importing ChromaDB
-try:
-    __import__('pysqlite3')
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except ImportError:
-    pass
-
-import chromadb
-from sentence_transformers import SentenceTransformer
 
 # 🤖 CrewAI Framework Engine Integration Modules
-from crewai import Agent, Task, Crew, Process, LLM
+from crewai import Agent, Task, Crew, LLM
 
 # 🔌 Official Model Context Protocol Client Packages
 from mcp import ClientSession
@@ -41,73 +29,34 @@ class SQLTranslationService:
             temperature=0.0
         )
 
-        # 📚 Vector DB Configuration Keys (Path B / RAG)
-        self.chroma_dir = os.getenv("CHROMA_PERSIST_DIR", "/home/cdsw/ask-data/backend/chroma_db")
-        self.collection_name = os.getenv("CHROMA_COLLECTION", "bank_jatim_knowledge")
-        
-        # 🧠 Initialize local embedding model directly on the vCPU allocation
-        print("🧠 Loading local MiniLM-L6 vector embedding weights...")
-        self.embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-        
-        # Connect to the persistent Chroma storage directory
-        self.chroma_client = chromadb.PersistentClient(path=self.chroma_dir)
-        self.collection = self.chroma_client.get_or_create_collection(name=self.collection_name)
-
-    async def _fetch_schema_via_mcp(self) -> str:
+    async def _call_mcp_tool(self, tool_name: str, arguments: dict = None) -> str:
         """
-        NATIVE MCP CLIENT ROUTINE: Connects directly to the universal /sse channel, 
-        initializes a session, and calls the schema tool over the standardized protocol.
+        UNIVERSAL NATIVE MCP CLIENT ROUTINE: Connects directly to the universal 
+        /sse channel, initializes a session, and routes any arbitrary tool execution 
+        request across the protocol stream.
         """
         sse_endpoint = f"{self.mcp_server_url.rstrip('/')}/sse"
         headers = {"Authorization": f"Bearer {self.api_token}"}
         
         try:
-            # Connect natively to the universal protocol stream channel
             async with sse_client(url=sse_endpoint, headers=headers) as (read_stream, write_stream):
                 async with ClientSession(read_stream, write_stream) as session:
                     # Perform official protocol initialization handshake
                     await session.initialize()
                     
-                    # Call the tool directly by its registered name payload
-                    result = await session.call_tool("get_database_schema")
-                    
-                    # Extract contents cleanly without manual JSON parsing keys
-                    if result and result.content:
-                        return result.content[0].text
-                    return "Error: Empty schema content returned from protocol channel."
-        except Exception as e:
-            print(f"⚠️ Native MCP Protocol fetch failed: {str(e)}")
-            return "Error: Unable to load structural layout matrix via protocol stream."
-
-    async def _execute_query_via_mcp(self, sql_query: str) -> str:
-        """
-        NATIVE MCP CLIENT ROUTINE: Connects to the /sse channel, initializes 
-        a session, and executes the generated query via the MCP execution tool.
-        """
-        sse_endpoint = f"{self.mcp_server_url.rstrip('/')}/sse"
-        headers = {"Authorization": f"Bearer {self.api_token}"}
-        
-        try:
-            async with sse_client(url=sse_endpoint, headers=headers) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    
-                    # Call the execution tool, passing the SQL string as a parameter
-                    result = await session.call_tool(
-                        "execute_banking_query", 
-                        arguments={"sql_query": sql_query}
-                    )
+                    # Call the tool dynamically using its registered signature payload
+                    result = await session.call_tool(tool_name, arguments=arguments or {})
                     
                     if result and result.content:
                         return result.content[0].text
-                    return "[]"
+                    return ""
         except Exception as e:
-            print(f"⚠️ Native MCP Query execution failed: {str(e)}")
-            return json.dumps([{"error": f"MCP Transmission Failure: {str(e)}"}])
+            print(f"⚠️ Native MCP Protocol fetch failed for tool [{tool_name}]: {str(e)}")
+            return json.dumps([{"error": f"MCP Gateway Disruption: {str(e)}"}])
 
     def run_mcp_query(self, sql_query: str) -> list:
-        """Synchronous wrapper to execute the query and parse the JSON response."""
-        raw_json = asyncio.run(self._execute_query_via_mcp(sql_query))
+        """Synchronous wrapper to execute relational queries via MCP."""
+        raw_json = asyncio.run(self._call_mcp_tool("execute_banking_query", {"sql_query": sql_query}))
         try:
             return json.loads(raw_json)
         except Exception:
@@ -120,9 +69,9 @@ class SQLTranslationService:
     def generate_sql(self, user_question: str) -> str:
         """Deterministic execution pipeline that forces schema adherence for compact models."""
         
-        # 1. Fetch unified blueprint (Schema + Centralized Guardrails) over MCP
+        # 1. Fetch unified blueprint (Schema + Centralized Guardrails) over MCP tool stream
         print("📡 Fetching unified database blueprint natively over MCP protocol streams...")
-        db_blueprint = asyncio.run(self._fetch_schema_via_mcp())
+        db_blueprint = asyncio.run(self._call_mcp_tool("get_database_schema"))
 
         # 2. Define the structural engineering persona
         sql_developer = Agent(
@@ -154,14 +103,13 @@ class SQLTranslationService:
         # 4. Assemble and launch the automated agent team context
         orchestration_crew = Crew(
             agents=[sql_developer],
-            tasks=[draft_sql_task],
-            process=Process.sequential
+            tasks=[draft_sql_task]
         )
 
         print("⏳ Initiating autonomous CrewAI execution pipeline via LiteLLM application layer...")
         ai_result = str(orchestration_crew.kickoff()).strip()
 
-        # Extract the pure query string from markdown blocks
+        # Extract the pure query string from markdown blocks for downstream execution
         if "```sql" in ai_result:
             return ai_result.split("```sql")[1].split("```")[0].strip()
         elif "SELECT" in ai_result.upper():
@@ -170,31 +118,24 @@ class SQLTranslationService:
         return ai_result
 
     # =========================================================================
-    # 📑 PATH B: KNOWLEDGE BASE VECTOR RETRIEVAL (RAG)
+    # 📑 PATH B: KNOWLEDGE BASE VECTOR RETRIEVAL (STANDARDIZED VIA MCP RAG)
     # =========================================================================
-    def retrieve_relevant_documents(self, query: str, top_k: int = 5) -> str:
-        """Runs semantic vector extraction against local persistent database storage."""
-        if self.collection.count() == 0:
-            return "No document metadata registered in Knowledge Base storage."
-
-        query_vector = self.embedding_model.encode(query).tolist()
-        
-        results = self.collection.query(
-            query_embeddings=[query_vector],
-            n_results=top_k
-        )
-        
-        retrieved_contexts = []
-        if results and 'documents' in results and results['documents']:
-            for idx, text in enumerate(results['documents'][0]):
-                source = results['metadatas'][0][idx]['source_file']
-                retrieved_contexts.append(f"[Source Manual: {source}]\n{text}")
-                
-        return "\n\n---\n\n".join(retrieved_contexts)
-
     def generate_rag_answer(self, user_question: str) -> str:
         """Coordinates unstructured context parsing with Qwen via LiteLLM to answer policies."""
-        document_context = self.retrieve_relevant_documents(user_question, top_k=5)
+        print("📡 Fetching semantic document context blocks natively over MCP protocol streams...")
+        
+        # 🔌 Fetch vector snippets completely through the standardized MCP data layer tool!
+        raw_context = asyncio.run(self._call_mcp_tool("search_policy_documents", {"query": user_question}))
+        
+        try:
+            parsed_docs = json.loads(raw_context)
+            # Reconstruct the JSON payload arrays into a cleanly structured textual prompt context
+            document_context = "\n\n---\n\n".join([
+                f"[Source: {d.get('title')}] (Similarity Score: {d.get('score')})\n{d.get('excerpt')}" 
+                for d in parsed_docs if "error" not in d
+            ])
+        except Exception:
+            document_context = raw_context
         
         compliance_officer = Agent(
             role="Authoritative Corporate Policy Compliance Specialist",
@@ -207,7 +148,7 @@ class SQLTranslationService:
         evaluate_policy_task = Task(
             description=(
                 f"Review the following corporate reference manuals carefully:\n\n"
-                f"VERIFIED CONTEXT:\n{document_context}\n\n"
+                f"VERIFIED CONTEXT FROM KNOWLEDGE STORE:\n{document_context}\n\n"
                 f"USER QUESTION: {user_question}\n\n"
                 f"MANDATE: Rely strictly on the reference text above. If details cannot be derived, "
                 f"state clearly that you do not possess that information. Do not hallucinate facts."
