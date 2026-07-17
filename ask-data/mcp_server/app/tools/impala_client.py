@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from impala.dbapi import connect
-from app.config import settings
+from app.tools.config import settings
 
 def _get_connection():
     """Establishes an authenticated connection channel to the Cloudera Impala database."""
