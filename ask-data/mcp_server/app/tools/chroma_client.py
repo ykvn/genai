@@ -15,7 +15,7 @@ import chromadb
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 
 # Explicitly import the centralized settings object to resolve the NameError
-from app.tools.config import settings
+from .config import settings
 
 _client: chromadb.PersistentClient | None = None
 
