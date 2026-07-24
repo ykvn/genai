@@ -83,7 +83,7 @@ def main() -> None:
     ensure_dependencies(frontend_dir, env)
 
     demo = build_ui()
-    port = int(os.environ.get("CDSW_APP_PORT")
+    port = int(os.environ.get("CDSW_APP_PORT"))
     print(f"🌐 Starting Gradio UI on http://127.0.0.1:{port}")
     demo.launch(server_name="127.0.0.1", server_port=port, share=False)
 
