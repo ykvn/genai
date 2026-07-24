@@ -6,9 +6,34 @@ from pathlib import Path
 
 def _resolve_frontend_dir() -> Path:
     """Resolve the frontend directory for CML and local execution."""
+    candidates = []
+
+    if "__file__" in globals():
+        current_file = Path(__file__).resolve()
+        candidates.extend([
+            current_file.parent,
+            current_file.parent.parent,
+        ])
+
+    cwd = Path.cwd()
+    candidates.extend([
+        cwd,
+        cwd / "frontend",
+        cwd / "ask-data" / "frontend",
+        cwd / "ask-data",
+        Path("/home/cdsw/ask-data/frontend"),
+        Path("/home/cdsw/frontend"),
+        Path("/home/cdsw"),
+    ])
+
+    for candidate in candidates:
+        candidate_path = candidate.resolve() if hasattr(candidate, "resolve") else Path(candidate)
+        if (candidate_path / "frontend_entry.py").exists():
+            return candidate_path
+
     if "__file__" in globals():
         return Path(__file__).resolve().parent
-    return Path.cwd()
+    return cwd
 
 
 FRONTEND_DIR = _resolve_frontend_dir()
