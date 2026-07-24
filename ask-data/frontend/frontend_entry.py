@@ -61,21 +61,6 @@ def ensure_dependencies(frontend_dir: Path, env: dict) -> None:
         sys.exit(1)
 
 
-def _coerce_backend_payload(response):
-    """Normalize backend responses so empty or non-JSON bodies are surfaced clearly."""
-    try:
-        return response.json(), None
-    except ValueError as exc:
-        status_code = getattr(response, "status_code", None)
-        text = (getattr(response, "text", "") or "").strip()
-
-        if not text:
-            return None, f"Backend returned an empty response body (status {status_code or 'unknown'})."
-        if status_code is not None and status_code >= 400:
-            return None, f"Backend returned HTTP {status_code}: {text}"
-        return None, f"Backend returned unexpected content: {text[:500]}"
-
-
 def build_ui() -> object:
     import gradio as gr
     import requests
@@ -93,20 +78,12 @@ def build_ui() -> object:
                 timeout=120,
             )
             response.raise_for_status()
-            payload, error = _coerce_backend_payload(response)
-            if error:
-                return f"Error contacting backend: {error}"
-            if isinstance(payload, dict):
-                if payload.get("response"):
-                    return payload["response"]
-                if payload.get("data"):
-                    return payload["data"]
-                return str(payload)
-            if payload:
-                return str(payload)
-            return "Backend returned an empty response."
-        except requests.RequestException as exc:
-            return f"Error contacting backend: {exc}"
+            payload = response.json()
+            if payload.get("response"):
+                return payload["response"]
+            if payload.get("data"):
+                return payload["data"]
+            return str(payload)
         except Exception as exc:
             return f"Error contacting backend: {exc}"
 
