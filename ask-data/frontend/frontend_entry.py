@@ -72,13 +72,24 @@ def build_ui() -> object:
             return "Please enter a question."
 
         try:
+            # 🔑 Read CML_TOKEN from environment and prepare headers
+            cml_token = os.environ.get("CML_TOKEN", "").strip()
+            headers = {
+                "Content-Type": "application/json",
+                "accept": "application/json",
+            }
+            if cml_token:
+                headers["Authorization"] = f"Bearer {cml_token}"
+
             response = requests.post(
                 backend_url,
                 json={"question": question},
+                headers=headers,
                 timeout=120,
             )
             response.raise_for_status()
             payload = response.json()
+
             if payload.get("response"):
                 return payload["response"]
             if payload.get("data"):
@@ -108,7 +119,7 @@ def main() -> None:
     ensure_dependencies(frontend_dir, env)
 
     demo = build_ui()
-    port = int(os.environ.get("CDSW_APP_PORT"))
+    port = int(os.environ.get("CDSW_APP_PORT", 8080))
     print(f"🌐 Starting Gradio UI on http://127.0.0.1:{port}")
     demo.launch(server_name="127.0.0.1", server_port=port, share=False)
 
