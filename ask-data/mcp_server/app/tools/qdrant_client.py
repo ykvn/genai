@@ -23,8 +23,8 @@ def _get_client() -> QdrantClient:
         )
         
         print(f"QdrantClient connecting to: {qdrant_url}")
-        # https_verify=False bypasses internal CML SSL certificate issues
-        _client = QdrantClient(url=qdrant_url, api_key=cml_token, https_verify=False)
+        # verify=False bypasses internal CML SSL certificate issues
+        _client = QdrantClient(url=qdrant_url, api_key=cml_token, verify=False)
     return _client
 
 
