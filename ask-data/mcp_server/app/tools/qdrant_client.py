@@ -23,13 +23,12 @@ def _get_client() -> QdrantClient:
         )
         
         print(f"QdrantClient connecting to: {qdrant_url}")
-        # verify=False bypasses SSL certificate issues
-        # check_compatibility=False silences server compatibility warnings
         _client = QdrantClient(
             url=qdrant_url, 
             api_key=cml_token, 
             verify=False, 
-            check_compatibility=False
+            check_compatibility=False,
+            timeout=60.0  # 👈 Prevents SSL handshake timeouts on slow CML proxies
         )
     return _client
 
@@ -53,7 +52,7 @@ def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[d
     try:
         query_vector = embedder.encode(query).tolist()
 
-        # Modern Qdrant API: query_points replaces search
+        # Modern Qdrant API
         response = client.query_points(
             collection_name=collection_name,
             query=query_vector,
@@ -61,7 +60,6 @@ def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[d
             with_payload=True
         )
 
-        # Extracted point items from query_points response
         results = response.points
 
         output = []
