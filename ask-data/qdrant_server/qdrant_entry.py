@@ -50,15 +50,16 @@ def resolve_data_path() -> str:
     return path
 
 
+from importlib.metadata import version, PackageNotFoundError
+
 def ensure_qdrant_client() -> None:
     """Ensures qdrant-client is installed in the current environment."""
     try:
-        import qdrant_client  # noqa: F401
-        logging.info("qdrant-client %s already installed", qdrant_client.__version__)
-    except ImportError:
+        qdrant_ver = version("qdrant-client")
+        logging.info("qdrant-client %s already installed", qdrant_ver)
+    except PackageNotFoundError:
         logging.info("Installing qdrant-client...")
         subprocess.run([sys.executable, "-m", "pip", "install", "-q", "qdrant-client>=1.7.0"], check=True)
-
 
 def ensure_qdrant_binary(server_dir: Path) -> Path:
     """
@@ -133,7 +134,8 @@ host = "127.0.0.1"  # Bound explicitly to loopback for CML Ingress Proxy
 qdrant_binary = ensure_qdrant_binary(server_dir)
 config_file = generate_qdrant_config(server_dir, data_path, host, port)
 
-logging.info("qdrant-client version : %s", qdrant_client.__version__)
+from importlib.metadata import version
+logging.info("qdrant-client version : %s", version("qdrant-client"))
 logging.info("Host                  : %s", host)
 logging.info("Port                  : %s", port)
 logging.info("Data path             : %s", data_path)
