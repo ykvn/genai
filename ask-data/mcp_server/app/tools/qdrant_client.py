@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import httpx
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from app.tools.config import settings
@@ -23,12 +24,24 @@ def _get_client() -> QdrantClient:
         )
         
         print(f"QdrantClient connecting to: {qdrant_url}")
+        
+        # 1. Force the exact Authorization header required by CML Ingress Proxies
+        custom_headers = {}
+        if cml_token:
+            custom_headers["Authorization"] = f"Bearer {cml_token}"
+            
+        # 2. Build a highly resilient HTTP client for CML network environments
+        http_client = httpx.Client(
+            verify=False,          # Bypass internal CML SSL issues
+            timeout=60.0,          # Prevent premature proxy timeouts
+            headers=custom_headers # Pass the CML Bearer Token correctly
+        )
+        
+        # 3. Initialize Qdrant using the custom CML-compliant HTTP client
         _client = QdrantClient(
             url=qdrant_url, 
-            api_key=cml_token, 
-            verify=False, 
             check_compatibility=False,
-            timeout=60.0  # 👈 Prevents SSL handshake timeouts on slow CML proxies
+            httpx_client=http_client
         )
     return _client
 
@@ -52,7 +65,7 @@ def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[d
     try:
         query_vector = embedder.encode(query).tolist()
 
-        # Modern Qdrant API
+        # Modern Qdrant API: query_points replaces search
         response = client.query_points(
             collection_name=collection_name,
             query=query_vector,
