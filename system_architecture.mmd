@@ -24,7 +24,7 @@ flowchart TD
     end
 
     subgraph Data_Services ["Data & AI Services"]
-        CHROMA["ChromaDB HTTP Server"]
+        QDRANT["QDrant HTTP Server"]
         LITELLM["LiteLLM Proxy"]
         QWEN["Qwen Inference Engine"]
         IMPALA_DB["Cloudera Impala Database"]
@@ -55,11 +55,11 @@ flowchart TD
 
     TRANSLATOR -->|"search_policy_documents - translator.py"| MCP
     MCP -->|"call tool - app/main.py"| TOOL_RAG
-    TOOL_RAG -->|"REST query - rag_search.py"| CHROMA
+    TOOL_RAG -->|"REST query - rag_search.py"| QDRANT
 
     BACKEND_ENTRY -->|"auto-ingest on startup - backend_entry.py"| INGEST
     DOCS -->|"read PDFs - ingest_knowledge.py"| INGEST
-    INGEST -->|"embed & store vectors - ingest_knowledge.py"| CHROMA
+    INGEST -->|"embed & store vectors - ingest_knowledge.py"| QDRANT
     REINDEX -->|"trigger re-index - reindex_knowledge.py"| INGEST
 
     BACKEND_ENTRY -->|"bootstrap - backend_entry.py"| CONFIG_LOADER
@@ -70,7 +70,7 @@ flowchart TD
     SYNTHETIC -->|"seed data - generate_synthetic.py"| IMPALA_DB
 
     IMPALA_DB -->|"result rows - impala_client.py"| TOOL_SQL
-    CHROMA -->|"context fragments - rag_search.py"| TOOL_RAG
+    QDRANT -->|"context fragments - rag_search.py"| TOOL_RAG
     QWEN -->|"generated SQL / answer - app/main.py"| LITELLM
     LITELLM -->|"LLM response - translator.py"| CREW
     TOOL_SQL -->|"JSON records - translator.py"| TRANSLATOR
