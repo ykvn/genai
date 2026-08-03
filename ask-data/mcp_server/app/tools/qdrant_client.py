@@ -1,49 +1,15 @@
 from __future__ import annotations
 
 import os
-import sys
-import httpx
-from qdrant_client import QdrantClient
+import requests
+import urllib3
 from sentence_transformers import SentenceTransformer
 from app.tools.config import settings
 
-_client: QdrantClient | None = None
+# Bypass internal CML SSL certificate warnings
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 _embedding_model: SentenceTransformer | None = None
-
-
-def _get_client() -> QdrantClient:
-    """Singleton connection routine ensuring a single Qdrant client connection."""
-    global _client
-    if _client is None:
-        qdrant_url = settings.qdrant_server_url
-        cml_token = (
-            os.getenv("CML_TOKEN") 
-            or os.getenv("CDSW_API_KEY") 
-            or os.getenv("QDRANT_SERVER_TOKEN") 
-            or None
-        )
-        
-        print(f"QdrantClient connecting to: {qdrant_url}")
-        
-        # 1. Force the exact Authorization header required by CML Ingress Proxies
-        custom_headers = {}
-        if cml_token:
-            custom_headers["Authorization"] = f"Bearer {cml_token}"
-            
-        # 2. Build a highly resilient HTTP client for CML network environments
-        http_client = httpx.Client(
-            verify=False,          # Bypass internal CML SSL issues
-            timeout=60.0,          # Prevent premature proxy timeouts
-            headers=custom_headers # Pass the CML Bearer Token correctly
-        )
-        
-        # 3. Initialize Qdrant using the custom CML-compliant HTTP client
-        _client = QdrantClient(
-            url=qdrant_url, 
-            check_compatibility=False,
-            httpx_client=http_client
-        )
-    return _client
 
 
 def _get_embedding_model() -> SentenceTransformer:
@@ -56,40 +22,67 @@ def _get_embedding_model() -> SentenceTransformer:
 
 def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[dict]:
     """
-    Queries local persistent vector stores and normalizes output arrays 
+    Queries Qdrant vector stores via native REST API and normalizes output arrays 
     into standardized dictionary formats with calculated similarity metrics.
     """
-    client = _get_client()
-    embedder = _get_embedding_model()
+    qdrant_url = settings.qdrant_server_url.rstrip("/")
+    cml_token = (
+        os.getenv("CML_TOKEN") 
+        or os.getenv("CDSW_API_KEY") 
+        or os.getenv("QDRANT_SERVER_TOKEN") 
+        or ""
+    ).strip()
     
     try:
+        # 1. Generate the query embedding
+        embedder = _get_embedding_model()
         query_vector = embedder.encode(query).tolist()
 
-        # Modern Qdrant API: query_points replaces search
-        response = client.query_points(
-            collection_name=collection_name,
-            query=query_vector,
-            limit=top_k,
-            with_payload=True
+        # 2. Prepare the Qdrant REST API Request
+        search_url = f"{qdrant_url}/collections/{collection_name}/points/search"
+        
+        # Force the exact Authorization header required by CML Ingress Proxies
+        headers = {}
+        if cml_token:
+            headers["Authorization"] = f"Bearer {cml_token}"
+
+        payload = {
+            "vector": query_vector,
+            "limit": top_k,
+            "with_payload": True
+        }
+
+        # 3. Execute request with an explicit 60-second timeout to prevent proxy drops
+        res = requests.post(
+            search_url, 
+            json=payload, 
+            headers=headers, 
+            verify=False, 
+            timeout=60.0
         )
+        
+        if res.status_code != 200:
+            return [{"error": f"Qdrant HTTP Error {res.status_code}: {res.text}"}]
 
-        results = response.points
-
+        # 4. Parse the REST response payload
+        results = res.json().get("result", [])
         output = []
-        for point in results:
-            payload = point.payload or {}
-            score = round(float(point.score), 4) if point.score is not None else None
+        
+        for item in results:
+            payload_data = item.get("payload", {})
+            score = round(float(item.get("score", 0.0)), 4) if item.get("score") is not None else None
             
-            source_file = payload.get("source_file", payload.get("title", "Unknown_Document"))
-            page_num = payload.get("page", "?")
-            doc_text = payload.get("page_content", payload.get("excerpt", ""))
+            source_file = payload_data.get("source_file", payload_data.get("title", "Unknown_Document"))
+            page_num = payload_data.get("page", "?")
+            doc_text = payload_data.get("page_content", payload_data.get("excerpt", ""))
             
             output.append({
-                "document_id": str(point.id),
+                "document_id": str(item.get("id", "unknown")),
                 "title": f"{source_file} (halaman {page_num})" if page_num != "?" else source_file,
                 "excerpt": doc_text[:400] if doc_text else "",
                 "score": score,
             })
+            
         return output
         
     except Exception as e:
