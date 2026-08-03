@@ -125,8 +125,7 @@ ensure_qdrant_client()
 
 import qdrant_client
 
-server_dir = Path(__file__).resolve().parent
-port = resolve_port()
+server_dir = Path(__file__).resolve().parent if "__file__" in globals() else Path("/home/cdsw/ask-data/qdrant_server")port = resolve_port()
 data_path = resolve_data_path()
 host = "127.0.0.1"  # Bound explicitly to loopback for CML Ingress Proxy
 
