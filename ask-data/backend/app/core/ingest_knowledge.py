@@ -123,24 +123,18 @@ def build_ingest_config(backend_dir, env=None):
         docs_dir = os.path.abspath(os.path.join(backend_path, "..", "data", "documents"))
 
     qdrant_server_url = (
-        env_map.get("QDRANT_SERVER_URL") 
-        or env_map.get("CHROMA_SERVER_URL", "")
+        env_map.get("QDRANT_SERVER_URL")
     ).strip()
 
     collection_name = (
-        env_map.get("QDRANT_COLLECTION") 
-        or env_map.get("CHROMA_COLLECTION", "")
+        env_map.get("QDRANT_COLLECTION")
     ).strip()
 
     # Read embedding model from .env variable QDRANT_MODEL
     embedding_model_name = env_map.get("QDRANT_MODEL", "all-MiniLM-L6-v2").strip()
 
     cml_token = (
-        env_map.get("CML_TOKEN") 
-        or env_map.get("CDSW_API_KEY") 
-        or env_map.get("QDRANT_SERVER_TOKEN") 
-        or env_map.get("CHROMA_SERVER_TOKEN") 
-        or ""
+        env_map.get("CML_TOKEN")
     ).strip()
 
     parsed_url = urlparse(qdrant_server_url)
