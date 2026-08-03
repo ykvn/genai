@@ -23,8 +23,14 @@ def _get_client() -> QdrantClient:
         )
         
         print(f"QdrantClient connecting to: {qdrant_url}")
-        # verify=False bypasses internal CML SSL certificate issues
-        _client = QdrantClient(url=qdrant_url, api_key=cml_token, verify=False)
+        # verify=False bypasses SSL certificate issues
+        # check_compatibility=False silences server compatibility warnings
+        _client = QdrantClient(
+            url=qdrant_url, 
+            api_key=cml_token, 
+            verify=False, 
+            check_compatibility=False
+        )
     return _client
 
 
@@ -47,13 +53,16 @@ def search_documents(query: str, collection_name: str, top_k: int = 5) -> list[d
     try:
         query_vector = embedder.encode(query).tolist()
 
-        # Perform vector distance search on Qdrant
-        results = client.search(
+        # Modern Qdrant API: query_points replaces search
+        response = client.query_points(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k,
             with_payload=True
         )
+
+        # Extracted point items from query_points response
+        results = response.points
 
         output = []
         for point in results:
